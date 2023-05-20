@@ -12,7 +12,7 @@ bool is_identifier(char ch) {
 
 }
 
-Token get_next_token(InputState &input, std::string &output) {
+Token get_next_token(InputState &input, std::string &output, bool space_cross_line) {
     // skip whitespaces and comments
     auto first_ch = input.get_next_ch();
     bool in_ml_comment = false;
@@ -52,7 +52,10 @@ Token get_next_token(InputState &input, std::string &output) {
             in_sl_comment = false;
             input.increase_lineno();
             output += '\n';
-            if (!in_ml_comment && !in_sl_comment) { input.set_line_start(true); }
+            if (!in_ml_comment && !in_sl_comment) {
+                input.set_line_start(true);
+                if (!space_cross_line) { return {TokenType::eEof, {}}; }
+            }
         } else if (!std::isspace(first_ch) && !in_ml_comment && !in_sl_comment) {
             break;
         } else {
@@ -79,6 +82,7 @@ Token get_next_token(InputState &input, std::string &output) {
             } else if (ch == first_ch) {
                 break;
             } else if (ch == EOF) {
+                input.skip_to_end();
                 return unknown;
             }
         }
@@ -100,19 +104,20 @@ Token get_next_token(InputState &input, std::string &output) {
         return {TokenType::eIdentifier, input.get_substr_to_curr(p_start)};
     } else if (std::isdigit(first_ch) || first_ch == '.') {
         auto second_ch = input.look_next_ch();
-        if (second_ch == EOF) { return unknown; }
         // number 0
         if (std::isblank(second_ch)) { return {TokenType::eNumber, input.get_substr_to_curr(p_start)}; }
         // single dot
-        if (is_identifier(second_ch)) { return {TokenType::eDot, input.get_substr_to_curr(p_start)}; }
+        if (second_ch == EOF || is_identifier(second_ch)) {
+            return {TokenType::eDot, input.get_substr_to_curr(p_start)};
+        }
         // triple dots ...
         if (second_ch == '.') {
-            input.skip_next_ch();
-            auto ch = input.get_next_ch();
-            if (ch == '.') {
+            auto third_ch = input.look_next_ch(1);
+            if (third_ch == '.') {
+                input.skip_chars(2);
                 return {TokenType::eTripleDots, input.get_substr_to_curr(p_start)};
             } else {
-                return unknown;
+                return {TokenType::eDot, input.get_substr_to_curr(p_start)};
             }
         }
         // number
@@ -127,7 +132,7 @@ Token get_next_token(InputState &input, std::string &output) {
             input.skip_next_ch();
             if (second_ch == '\'') {
                 second_ch = input.get_next_ch();
-                if (!std::isdigit(second_ch)) { return unknown; }
+                if (!std::isdigit(second_ch)) { input.skip_to_end(); return unknown; }
             }
             if (second_ch == 'x' || second_ch == 'X') {
                 base = 16;
@@ -155,32 +160,33 @@ Token get_next_token(InputState &input, std::string &output) {
             auto ch = input.look_next_ch();
             bool last_is_sep = ch == '\'';
             if (last_is_sep) {
-                if (!can_be_sep) { return unknown; }
+                if (!can_be_sep) { input.skip_to_end(); return unknown; }
                 input.skip_next_ch();
                 ch = input.look_next_ch();
             }
             if (ch == '.') {
-                if (has_dot || has_exp || last_is_sep || base == 2) { return unknown; }
+                if (has_dot || has_exp || last_is_sep || base == 2) { input.skip_to_end(); return unknown; }
                 has_dot = true;
                 can_be_sep = false;
                 if (base == 8) { base = 10; }
             } else if (base != 16 && (ch == 'e' || ch == 'E')) {
-                if (has_exp || last_is_sep || base == 2) { return unknown; }
+                if (has_exp || last_is_sep || base == 2) { input.skip_to_end(); return unknown; }
                 exp_start = true;
                 has_exp = true;
                 can_be_sep = false;
                 if (base == 8) { base = 10; }
             } else if (base == 16 && (ch == 'p' || ch == 'P')) {
-                if (has_exp || last_is_sep) { return unknown; }
+                if (has_exp || last_is_sep) { input.skip_to_end(); return unknown; }
                 exp_start = true;
                 has_exp = true;
                 can_be_sep = false;
             } else if (ch == '-' && !last_exp_start) {
+                input.skip_to_end();
                 return unknown;
             } else if ((has_exp || has_dot) && (ch == 'f' || ch == 'F')) {
                 number_end = input.get_p_curr();
             } else if (('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')) {
-                if (base != 16 || has_exp) { return unknown; }
+                if (base != 16 || has_exp) { input.skip_to_end(); return unknown; }
                 can_be_sep = true;
             } else if (std::isdigit(ch)) {
                 can_be_sep = true;
@@ -194,7 +200,7 @@ Token get_next_token(InputState &input, std::string &output) {
         auto number_str = input.get_substr(p_start, number_end);
         if (base == 8) {
             for (auto ch : number_str) {
-                if (ch == '8' || ch == '9') { return unknown; }
+                if (ch == '8' || ch == '9') { input.skip_to_end(); return unknown; }
             }
         }
         auto remaining = input.get_substr_to_end(number_end);
@@ -376,6 +382,7 @@ Token get_next_token(InputState &input, std::string &output) {
     } else if (first_ch == ':') {
         return {TokenType::eColon, input.get_substr_to_curr(p_start)};
     }
+    input.skip_to_end();
     return unknown;
 }
 

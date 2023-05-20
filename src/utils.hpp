@@ -23,6 +23,7 @@ public:
     char look_next_ch(size_t offset) const;
     char get_next_ch();
     void skip_next_ch();
+    void skip_to_end();
 
     void skip_chars(size_t count);
 

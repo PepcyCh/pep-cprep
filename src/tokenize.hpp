@@ -9,6 +9,7 @@ enum class TokenType {
     eIdentifier,
     eString,
     eChar,
+    eRawString, // TODO
     eNumber,
     eSharp,
     eDoubleSharp,
@@ -67,6 +68,6 @@ struct Token final {
     std::string_view value;
 };
 
-Token get_next_token(InputState &input, std::string &output);
+Token get_next_token(InputState &input, std::string &output, bool space_cross_line = true);
 
 }

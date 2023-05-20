@@ -9,7 +9,7 @@ class ShaderIncluder {
 public:
     struct Result {
         std::string_view header_content;
-        std::string_view header_path;
+        std::string header_path;
     };
 
     virtual ~ShaderIncluder() = default;

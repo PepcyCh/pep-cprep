@@ -31,6 +31,10 @@ void InputState::skip_chars(size_t count) {
     col_ += real_count;
 }
 
+void InputState::skip_to_end() {
+    p_curr_ = p_end_;
+}
+
 std::string_view InputState::get_substr(
     std::string_view::const_iterator p_start, std::string_view::const_iterator p_end
 ) const {
