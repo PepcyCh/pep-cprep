@@ -9,7 +9,6 @@ enum class TokenType {
     eIdentifier,
     eString,
     eChar,
-    eRawString, // TODO
     eNumber,
     eSharp,
     eDoubleSharp,

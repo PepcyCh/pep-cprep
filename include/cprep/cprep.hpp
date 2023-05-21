@@ -7,7 +7,8 @@ namespace pep::cprep {
 
 class ShaderIncluder {
 public:
-    struct Result {
+    struct Result final {
+        // derived class should own header content
         std::string_view header_content;
         std::string header_path;
     };
@@ -15,6 +16,9 @@ public:
     virtual ~ShaderIncluder() = default;
 
     virtual bool require_header(std::string_view header_name, std::string_view file_path, Result &result) const = 0;
+
+    // derived class can release owned header contents in 'clear()'
+    virtual void clear();
 };
 
 class Preprocesser final {
@@ -28,10 +32,16 @@ public:
     Preprocesser(Preprocesser &&rhs);
     Preprocesser &operator=(Preprocesser &&rhs);
 
-    std::string do_preprocess(
+    struct Result final {
+        std::string parsed_result;
+        std::string error;
+        std::string warning;
+    };
+
+    Result do_preprocess(
         std::string_view input_path,
         std::string_view input_content,
-        ShaderIncluder *includer,
+        ShaderIncluder &includer,
         std::string_view *options = nullptr,
         size_t num_options = 0
     );

@@ -26,6 +26,7 @@ public:
     void skip_to_end();
 
     void skip_chars(size_t count);
+    void unget_chars(size_t count);
 
     std::string_view get_substr(std::string_view::const_iterator p_start, std::string_view::const_iterator p_end) const;
     std::string_view get_substr(std::string_view::const_iterator p_start, size_t count) const;
