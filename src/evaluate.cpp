@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <format>
+#include <stack>
 #include <variant>
 #include <cmath>
 #include <cctype>
@@ -61,7 +62,7 @@ int64_t str_to_number(std::string_view str) {
 
 struct Operator final {
     TokenType op;
-    // 0 - ,
+    // 0 - , ( )
     // 1 - ?:
     // 2 - ||
     // 3 - &&
@@ -115,6 +116,9 @@ struct Operator final {
             case TokenType::eColon:
                 return {token.type, 1u};
             case TokenType::eComma:
+            case TokenType::eLeftBracketRound:
+            case TokenType::eRightBracketRound:
+            case TokenType::eEof: // treat eof as )
                 return {token.type, 0u};
             default:
                 throw EvaluateError{std::format("operator '{}' not allowed here", token.value)};
@@ -123,7 +127,27 @@ struct Operator final {
 };
 
 int64_t do_binary_op(TokenType op, int64_t a, int64_t b) {
-    // TODO
+    switch (op) {
+        case TokenType::eAdd: return a + b;
+        case TokenType::eSub: return a - b;
+        case TokenType::eMul: return a * b;
+        case TokenType::eDiv: return a / b;
+        case TokenType::eMod: return a % b;
+        case TokenType::eBShl: return a << b;
+        case TokenType::eBShr: return a >> b;
+        case TokenType::eLess: return a < b;
+        case TokenType::eLessEq: return a <= b;
+        case TokenType::eGreater: return a > b;
+        case TokenType::eGreaterEq: return a >= b;
+        case TokenType::eEq: return a == b;
+        case TokenType::eNotEq: return a != b;
+        case TokenType::eBAnd: return a & b;
+        case TokenType::eBXor: return a ^ b;
+        case TokenType::eBOr: return a | b;
+        case TokenType::eLAnd: return a && b;
+        case TokenType::eLOr: return a || b;
+        default: unreachable();
+    }
 }
 
 }
@@ -131,16 +155,21 @@ int64_t do_binary_op(TokenType op, int64_t a, int64_t b) {
 bool evaluate_expression(InputState &input) {
     std::vector<int64_t> values;
     std::vector<Operator> ops;
+    std::stack<size_t> left_brackets;
+    left_brackets.push(0);
     bool prev_is_number = false;
+    size_t num_questions = 0;
+    std::stack<size_t> num_questions_left_bracket;
+    num_questions_left_bracket.push(0);
     std::string temp{};
     while (true) {
         auto token = get_next_token(input, temp, false);
-        if (token.type == TokenType::eEof) {
-            break;
-        }
         if (token.type == TokenType::eNumber) {
+            if (prev_is_number) {
+                throw EvaluateError{std::format("expected an operator after a number")};
+            }
             auto value = str_to_number(token.value);
-            if (!ops.empty() && ops.back().is_unary()) {
+            while (!ops.empty() && ops.back().is_unary()) {
                 switch (ops.back().op) {
                     case TokenType::eAdd: break;
                     case TokenType::eSub: value = -value; break;
@@ -153,34 +182,86 @@ bool evaluate_expression(InputState &input) {
             values.push_back(value);
             prev_is_number = true;
         } else {
-            // TODO - brackets
             auto op = Operator::from_token(token, prev_is_number);
-            size_t start = ops.size();
-            while (start > 0 && ops[start - 1].priority > op.priority) {
-                --start;
-            }
-            int64_t value = values[start];
-            for (size_t i = start; i < ops.size(); i++) {
-                if (ops[i].op != TokenType::eQuestion && ops[i].op != TokenType::eColon) {
+            if (op.op == TokenType::eLeftBracketRound) {
+                if (prev_is_number) {
+                    throw EvaluateError{std::format("expected an operator before '('")};
+                }
+                left_brackets.push(values.size());
+                num_questions_left_bracket.push(num_questions);
+                prev_is_number = false;
+            } else if (op.op == TokenType::eComma) {
+                // clear stack since expressions before comma will not have any (side) effect
+                if (!prev_is_number) {
+                    throw EvaluateError{std::format("expected a number after an operator other than ')'")};
+                }
+                if (num_questions > num_questions_left_bracket.top()) {
+                    throw EvaluateError{std::format("'?' without a ':'")};
+                }
+                values.resize(left_brackets.top());
+                ops.resize(left_brackets.top());
+                prev_is_number = false;
+            } else {
+                if (!prev_is_number) {
+                    throw EvaluateError{std::format("expected a number after an operator other than ')'")};
+                }
+                if (op.op == TokenType::eQuestion) {
+                    ++num_questions;
+                } else if (op.op == TokenType::eColon) {
+                    if (num_questions == num_questions_left_bracket.top()) {
+                        throw EvaluateError{std::format("':' before a '?'")};
+                    }
+                    --num_questions;
+                }
+                size_t start = ops.size();
+                // leave ternary op at last
+                while (
+                    start > left_brackets.top() && ops[start - 1].priority > op.priority && ops[start - 1].priority > 1
+                ) {
+                    --start;
+                }
+                int64_t value = values[start];
+                for (size_t i = start; i < ops.size(); i++) {
                     value = do_binary_op(ops[i].op, value, values[i + 1]);
+                }
+                values.resize(start + 1);
+                values[start] = value;
+                if (op.op == TokenType::eRightBracketRound || op.op == TokenType::eEof) {
+                    if (num_questions > num_questions_left_bracket.top()) {
+                        throw EvaluateError{std::format("'?' without a ':'")};
+                    }
+                    // calc ternary backward
+                    std::stack<int64_t> ternary_values;
+                    ternary_values.push(values.back());
+                    for (size_t i = ops.size(); i > left_brackets.top(); i--) {
+                        if (ops[i - 1].op == TokenType::eColon) {
+                            ternary_values.push(values[i - 1]);
+                        } else {
+                            auto t = ternary_values.top();
+                            ternary_values.pop();
+                            auto f = ternary_values.top();
+                            ternary_values.pop();
+                            ternary_values.push(values[i - 1] ? t : f);
+                        }
+                    }
+                    ops.resize(start);
+                    left_brackets.pop();
+                    num_questions_left_bracket.pop();
+                    if (op.op == TokenType::eEof) { break; }
+                    // set to TRUE, '+' and '-' after ')' is add/sub instead of pos/neg
+                    prev_is_number = true;
                 } else {
-                    // TODO - ternary
+                    ops.resize(start + 1);
+                    ops[start] = op;
+                    prev_is_number = false;
                 }
             }
-            values.resize(start + 1);
-            values[start] = value;
-            ops.resize(start);
         }
     }
-    int64_t value = values[0];
-    for (size_t i = 0; i < ops.size(); i++) {
-        if (ops[i].op != TokenType::eQuestion && ops[i].op != TokenType::eColon) {
-            value = do_binary_op(ops[i].op, value, values[i + 1]);
-        } else {
-            // TODO - ternary
-        }
+    if (num_questions > 0) {
+        throw EvaluateError{std::format("'?' without a ':'")};
     }
-    return value;
+    return values[0];
 }
 
 }
