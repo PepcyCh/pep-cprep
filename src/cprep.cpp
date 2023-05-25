@@ -209,7 +209,7 @@ struct Preprocesser::Impl final {
         }
 
         if (if_stack.size() > 1) {
-            throw PreprocessError{"Unterminated conditional directive"};
+            throw PreprocessError{"unterminated conditional directive"};
         }
     }
 
@@ -327,6 +327,7 @@ struct Preprocesser::Impl final {
                         .file = files.top().path,
                         .lineno = input.get_lineno(),
                     };
+                    auto macro_name = token.value;
                     auto start = input.get_p_curr();
                     if (auto ch = input.look_next_ch(); ch == '(') {
                         input.skip_next_ch();
@@ -364,6 +365,7 @@ struct Preprocesser::Impl final {
                     }
                     macro.replace = trim_string_view(input.get_substr_to_curr(start));
                     unknown_directive = false;
+                    defines.insert({macro_name, std::move(macro)});
                 } else if (token.value == "undef") {
                     token = get_next_token(input, temp, false);
                     if (token.type != TokenType::eIdentifier) {
@@ -434,7 +436,9 @@ struct Preprocesser::Impl final {
                     )};
                 }
                 if (if_stack.top() == IfState::eFalseWithoutTrueBefore) {
-                    if_stack.push(if_state_from_bool(evaluate()));
+                    if_stack.top() = if_state_from_bool(evaluate());
+                } else {
+                    if_stack.top() = IfState::eFalseWithTrueBefore;
                 }
             } else if (token.value == "endif") {
                 if (if_stack.size() == 1) {
@@ -490,9 +494,9 @@ struct Preprocesser::Impl final {
                         if (token.type != TokenType::eIdentifier) {
                             throw PreprocessError{std::format("{}, expected an identifier inside 'defined'", err_loc)};
                         }
-                        auto value = defines.contains(token.value);
+                        value = defines.contains(token.value);
                         token = get_next_token(inputs.top(), replaced, false);
-                        if (token.type != TokenType::eLeftBracketRound) {
+                        if (token.type != TokenType::eRightBracketRound) {
                             throw PreprocessError{std::format("{}, expected a ')' after 'defined'", err_loc)};
                         }
                     }

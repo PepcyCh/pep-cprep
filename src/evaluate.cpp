@@ -27,10 +27,10 @@ int char_to_number(char ch) {
 
 int64_t str_to_number(std::string_view str) {
     int64_t base = 10;
-    auto is_integer = str.find('.') != std::string_view::npos
+    auto is_floating = str.find('.') != std::string_view::npos
         || (!str.starts_with("0x") && str.find_first_of("eE") != std::string_view::npos)
         || (str.starts_with("0x") && str.find_first_of("pP") != std::string_view::npos);
-    if (!is_integer) {
+    if (is_floating) {
         throw EvaluateError{"floating point literal in preprocessor expression."};
     }
     size_t i = 0;
@@ -233,7 +233,7 @@ bool evaluate_expression(InputState &input) {
                     // calc ternary backward
                     std::stack<int64_t> ternary_values;
                     ternary_values.push(values.back());
-                    for (size_t i = ops.size(); i > left_brackets.top(); i--) {
+                    for (size_t i = start; i > left_brackets.top(); i--) {
                         if (ops[i - 1].op == TokenType::eColon) {
                             ternary_values.push(values[i - 1]);
                         } else {

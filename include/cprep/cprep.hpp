@@ -18,7 +18,7 @@ public:
     virtual bool require_header(std::string_view header_name, std::string_view file_path, Result &result) const = 0;
 
     // derived class can release owned header contents in 'clear()'
-    virtual void clear();
+    virtual void clear() {}
 };
 
 class Preprocesser final {

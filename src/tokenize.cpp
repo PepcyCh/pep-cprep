@@ -6,8 +6,8 @@ namespace pep::cprep {
 
 namespace {
 
-bool is_identifier(char ch) {
-    return std::isalnum(ch) || ch == '_' || ch == '$';
+bool is_identifier_head(char ch) {
+    return std::isalpha(ch) || ch == '_' || ch == '$';
 }
 
 }
@@ -105,10 +105,10 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         } else {
             return {TokenType::eSharp, input.get_substr_to_curr(p_start)};
         }
-    } else if (is_identifier(first_ch)) {
+    } else if (is_identifier_head(first_ch)) {
         while (true) {
             auto ch = input.look_next_ch();
-            if (!is_identifier(ch) && !std::isdigit(ch)) { break; }
+            if (!is_identifier_head(ch) && !std::isdigit(ch)) { break; }
             input.skip_next_ch();
         }
         return {TokenType::eIdentifier, input.get_substr_to_curr(p_start)};
@@ -117,11 +117,11 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         // number 0
         if (std::isblank(second_ch)) { return {TokenType::eNumber, input.get_substr_to_curr(p_start)}; }
         // single dot
-        if (second_ch == EOF || is_identifier(second_ch)) {
+        if (first_ch == '.' && (second_ch == EOF || is_identifier_head(second_ch))) {
             return {TokenType::eDot, input.get_substr_to_curr(p_start)};
         }
         // triple dots ...
-        if (second_ch == '.') {
+        if (first_ch == '.' && second_ch == '.') {
             auto third_ch = input.look_next_ch(1);
             if (third_ch == '.') {
                 input.skip_chars(2);
@@ -166,13 +166,14 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             has_dot = true;
             can_be_sep = false;
         }
-        while (number_end != input.get_p_end()) {
+        while (number_end == input.get_p_end() && !input.is_end()) {
             auto ch = input.look_next_ch();
             bool last_is_sep = ch == '\'';
             if (last_is_sep) {
                 if (!can_be_sep) { return unknown(); }
                 input.skip_next_ch();
-                ch = input.look_next_ch();
+                can_be_sep = false;
+                continue;
             }
             if (ch == '.') {
                 if (has_dot || has_exp || last_is_sep || base == 2) { return unknown(); }
