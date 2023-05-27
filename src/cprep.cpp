@@ -277,15 +277,31 @@ struct Preprocesser::Impl final {
                 } else if (token.value == "include") {
                     token = get_next_token(input, temp, false);
                     std::string_view header_name{};
+                    std::string macro_replaced{};
+                    InputState macro_input{macro_replaced};
+                    InputState *header_input = &input;
+                    if (token.type == TokenType::eIdentifier) {
+                        if (auto it = defines.find(token.value); it != defines.end()) {
+                            macro_replaced = replace_macro(token.value, it->second);
+                            macro_input = InputState{macro_replaced};
+                            header_input = &macro_input;
+                        } else {
+                            throw PreprocessError{std::format(
+                                "at file '{}' line {}, expected a header file name\n",
+                                files.top().path, input.get_lineno()
+                            )};
+                        }
+                        token = get_next_token(*header_input, temp, false);
+                    }
                     if (token.type == TokenType::eString) {
                         header_name = token.value.substr(1, token.value.size() - 2);
                     } else if (token.type == TokenType::eLess) {
-                        auto start = input.get_p_curr();
+                        auto start = header_input->get_p_curr();
                         while (true) {
-                            auto ch = input.look_next_ch();
+                            auto ch = header_input->look_next_ch();
                             if (ch == '>') {
-                                header_name = std::string_view{start, input.get_p_curr()};
-                                input.skip_next_ch();
+                                header_name = std::string_view{start, header_input->get_p_curr()};
+                                header_input->skip_next_ch();
                                 break;
                             } else if (ch == EOF || ch == '\n') {
                                 throw PreprocessError{std::format(
@@ -293,10 +309,9 @@ struct Preprocesser::Impl final {
                                     files.top().path, input.get_lineno()
                                 )};
                             }
-                            input.skip_next_ch();
+                            header_input->skip_next_ch();
                         }
                     } else {
-                        // TODO - include macro
                         throw PreprocessError{std::format(
                             "at file '{}' line {}, expected a header file name\n",
                             files.top().path, input.get_lineno()
