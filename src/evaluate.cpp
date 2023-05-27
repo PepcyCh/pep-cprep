@@ -62,7 +62,7 @@ int64_t str_to_number(std::string_view str) {
 
 struct Operator final {
     TokenType op;
-    // 0 - , ( )
+    // 0 - ,
     // 1 - ?:
     // 2 - ||
     // 3 - &&
@@ -75,6 +75,7 @@ struct Operator final {
     // 10 - + - (binary)
     // 11 - * / %
     // 12 - + - ! ~ (unary)
+    // 13 - ( )
     uint32_t priority;
 
     bool is_unary() const { return priority == 12; }
@@ -116,10 +117,11 @@ struct Operator final {
             case TokenType::eColon:
                 return {token.type, 1u};
             case TokenType::eComma:
+                return {token.type, 0u};
             case TokenType::eLeftBracketRound:
             case TokenType::eRightBracketRound:
             case TokenType::eEof: // treat eof as )
-                return {token.type, 0u};
+                return {token.type, 13u};
             default:
                 throw EvaluateError{std::format("operator '{}' not allowed here", token.value)};
         }
@@ -216,7 +218,7 @@ bool evaluate_expression(InputState &input) {
                 size_t start = ops.size();
                 // leave ternary op at last
                 while (
-                    start > left_brackets.top() && ops[start - 1].priority > op.priority && ops[start - 1].priority > 1
+                    start > left_brackets.top() && ops[start - 1].priority < op.priority && ops[start - 1].priority > 1
                 ) {
                     --start;
                 }

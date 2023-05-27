@@ -96,7 +96,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 return unknown();
             }
         }
-        return {type, input.get_substr(p_start + 1, input.get_p_curr() - 1)};
+        return {type, input.get_substr(p_start, input.get_p_curr())};
     } else if (first_ch == '#') {
         auto second_ch = input.look_next_ch();
         if (second_ch == '#') {
@@ -139,28 +139,33 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         auto number_end = input.get_p_end();
         uint32_t base = 10;
         if (first_ch == '0') {
-            input.skip_next_ch();
             if (second_ch == '\'') {
+                input.skip_next_ch();
                 second_ch = input.get_next_ch();
                 if (!std::isdigit(second_ch)) { return unknown(); }
             }
             if (second_ch == 'x' || second_ch == 'X') {
+                input.skip_next_ch();
                 base = 16;
                 can_be_sep = false;
             } else if (second_ch == 'b' || second_ch == 'B') {
+                input.skip_next_ch();
                 base = 2;
                 can_be_sep = false;
             } else if (second_ch == 'e' || second_ch == 'E') {
+                input.skip_next_ch();
                 last_exp_start = true;
                 has_exp = true;
                 can_be_sep = false;
             } else if (std::isdigit(second_ch)) {
+                input.skip_next_ch();
                 base = 8;
             } else if (second_ch == '.') {
+                input.skip_next_ch();
                 has_dot = true;
                 can_be_sep = false;
             } else {
-                number_end = input.get_p_curr() - 1;
+                number_end = input.get_p_curr();
             }
         } else if (first_ch == '.') {
             has_dot = true;

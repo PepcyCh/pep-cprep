@@ -278,7 +278,7 @@ struct Preprocesser::Impl final {
                     token = get_next_token(input, temp, false);
                     std::string_view header_name{};
                     if (token.type == TokenType::eString) {
-                        header_name = token.value;
+                        header_name = token.value.substr(1, token.value.size() - 2);
                     } else if (token.type == TokenType::eLess) {
                         auto start = input.get_p_curr();
                         while (true) {
@@ -296,6 +296,7 @@ struct Preprocesser::Impl final {
                             input.skip_next_ch();
                         }
                     } else {
+                        // TODO - include macro
                         throw PreprocessError{std::format(
                             "at file '{}' line {}, expected a header file name\n",
                             files.top().path, input.get_lineno()
@@ -533,7 +534,7 @@ struct Preprocesser::Impl final {
             curr_line = inputs.top().get_lineno();
         }
 
-        std::string result_phase1{};
+        // parse arguments for function-like macro
         std::vector<std::string_view> args;
         if (macro.function_like) {
             std::string fallback{macro_name};
@@ -544,7 +545,7 @@ struct Preprocesser::Impl final {
                 return fallback;
             }
             size_t num_brackets = 0;
-            auto last_begin = token.value.end();
+            auto last_begin = token.value.data() + token.value.size();
             while (true) {
                 token = get_next_token(inputs.top(), fallback);
                 if (token.type == TokenType::eEof) {
@@ -564,15 +565,15 @@ struct Preprocesser::Impl final {
                     ++num_brackets;
                 } else if (token.type == TokenType::eRightBracketRound) {
                     if (num_brackets == 0) {
-                        args.push_back(trim_string_view({last_begin, token.value.begin()}));
+                        args.push_back(trim_string_view({last_begin, token.value.data()}));
                         break;
                     } else {
                         --num_brackets;
                     }
                 } else if (token.type == TokenType::eComma) {
                     if (num_brackets == 0) {
-                        args.push_back(trim_string_view({last_begin, token.value.begin()}));
-                        last_begin = token.value.end();
+                        args.push_back(trim_string_view({last_begin, token.value.data()}));
+                        last_begin = token.value.data() + token.value.size();
                     }
                 }
             }
@@ -602,10 +603,12 @@ struct Preprocesser::Impl final {
         inputs.emplace(macro.replace);
 
         // replace macro parameters and __VA_ARGS__, do stringification and concatenation
+        std::string result_phase1{};
         auto token = get_next_token(inputs.top(), result_phase1);
+        std::string spaces{};
         std::string concat_str{};
         while (true) {
-            auto next_token = get_next_token(inputs.top(), result_phase1);
+            auto next_token = get_next_token(inputs.top(), spaces);
             if (token.type == TokenType::eEof) {
                 inputs.pop();
                 break;
@@ -633,7 +636,7 @@ struct Preprocesser::Impl final {
                     }
                     result_phase1 += '"';
                 } else {
-                    auto it = std::find(macro.params.begin(), macro.params.end(), token.value);
+                    auto it = std::find(macro.params.begin(), macro.params.end(), next_token.value);
                     if (it == macro.params.end()) {
                         inputs.pop();
                         throw PreprocessError{std::format(
@@ -643,22 +646,25 @@ struct Preprocesser::Impl final {
                     }
                     result_phase1 += '"' + stringify(args[it - macro.params.begin()]) + '"';
                 }
-                token = next_token;
+                token = get_next_token(inputs.top(), result_phase1);
+                spaces.clear();
                 continue;
             }
             // concat
             if (next_token.type == TokenType::eDoubleSharp) {
-                next_token = get_next_token(inputs.top(), result_phase1);
+                next_token = get_next_token(inputs.top(), spaces);
                 if (concat_str.empty()) {
                     concat_str = token.value;
                 }
                 concat_str += next_token.value;
                 token = next_token;
+                spaces.clear();
                 continue;
             } else if (!concat_str.empty()) {
                 result_phase1 += concat_str;
-                result_phase1 += " ";
+                result_phase1 += spaces;
                 token = next_token;
+                spaces.clear();
                 continue;
             }
             // others
@@ -695,14 +701,15 @@ struct Preprocesser::Impl final {
                 result_phase1 += token.value;
             }
             token = next_token;
+            result_phase1 += spaces;
+            spaces.clear();
         }
 
         // replace macro in replaced string
         inputs.emplace(result_phase1);
         std::string result{};
-        token = get_next_token(inputs.top(), result);
         while (true) {
-            auto next_token = get_next_token(inputs.top(), result);
+            token = get_next_token(inputs.top(), result);
             if (token.type == TokenType::eEof) {
                 inputs.pop();
                 break;
@@ -711,17 +718,18 @@ struct Preprocesser::Impl final {
                 if (auto it = defines.find(token.value); it != defines.end()) {
                     result += replace_macro(token.value, it->second, false, depth + 1);
                 } else if (macro.has_va_params && token.value == "__VA_OPT__") {
-                    if (next_token.type == TokenType::eLeftBracketRound) {
+                    token = get_next_token(inputs.top(), result);
+                    if (token.type == TokenType::eLeftBracketRound) {
                         size_t num_brackets = 0;
                         auto opt_true = args.size() > macro.params.size();
                         while (true) {
-                            next_token = get_next_token(inputs.top(), result);
-                            if (next_token.type == TokenType::eEof) {
+                            token = get_next_token(inputs.top(), result);
+                            if (token.type == TokenType::eEof) {
                                 break;
-                            } else if (next_token.type == TokenType::eLeftBracketRound) {
+                            } else if (token.type == TokenType::eLeftBracketRound) {
                                 ++num_brackets;
                                 if (opt_true) { result += token.value; }
-                            } else if (next_token.type == TokenType::eRightBracketRound) {
+                            } else if (token.type == TokenType::eRightBracketRound) {
                                 if (num_brackets == 0) {
                                     break;
                                 }
@@ -731,8 +739,6 @@ struct Preprocesser::Impl final {
                                 if (opt_true) { result += token.value; }
                             }
                         }
-                        // first token after ')' used for next loop
-                        next_token = get_next_token(inputs.top(), result);
                     } else {
                         result += token.value;
                     }
@@ -742,7 +748,6 @@ struct Preprocesser::Impl final {
             } else {
                 result += token.value;
             }
-            token = next_token;
         }
 
         return result;
