@@ -59,6 +59,7 @@ enum class TokenType {
     eColon,
     eSemicolon,
     eComma,
+    eScope,
     eUnknown,
 };
 

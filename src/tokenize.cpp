@@ -395,7 +395,13 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
     } else if (first_ch == '?') {
         return {TokenType::eQuestion, input.get_substr_to_curr(p_start)};
     } else if (first_ch == ':') {
-        return {TokenType::eColon, input.get_substr_to_curr(p_start)};
+        auto second_ch = input.look_next_ch();
+        if (second_ch == ':') {
+            input.skip_next_ch();
+            return {TokenType::eScope, input.get_substr_to_curr(p_start)};
+        } else {
+            return {TokenType::eColon, input.get_substr_to_curr(p_start)};
+        }
     }
     input.skip_to_end();
     return unknown();
