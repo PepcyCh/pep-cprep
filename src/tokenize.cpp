@@ -12,7 +12,7 @@ bool is_identifier_head(char ch) {
 
 }
 
-Token get_next_token(InputState &input, std::string &output, bool space_cross_line) {
+Token get_next_token(InputState &input, std::string &output, bool space_cross_line, SpaceKeepType keep) {
     // skip whitespaces and comments
     auto first_ch = input.get_next_ch();
     bool in_ml_comment = false;
@@ -23,7 +23,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             if (second_ch == '*') {
                 input.skip_next_ch();
                 in_ml_comment = true;
-                output += "  ";
+                if ((keep & SpaceKeepType::eSpace) != SpaceKeepType::eNothing) { output += "  "; }
             } else if (second_ch == '/') {
                 input.skip_next_ch();
                 in_sl_comment = true;
@@ -35,7 +35,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             if (second_ch == '/') {
                 input.skip_next_ch();
                 in_ml_comment = false;
-                output += "  ";
+                if ((keep & SpaceKeepType::eSpace) != SpaceKeepType::eNothing) { output += "  "; }
             }
         } else if (first_ch == '\\') {
             auto second_ch = input.look_next_ch();
@@ -44,7 +44,11 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 input.skip_next_ch();
                 if (second_ch == '\r') { input.skip_next_ch(); }
                 input.increase_lineno();
-                output += "\\\n";
+                if ((keep & SpaceKeepType::eBackSlash) != SpaceKeepType::eNothing) {
+                    output += "\\\n";
+                } else if ((keep & SpaceKeepType::eNewLine) != SpaceKeepType::eNothing) {
+                    output += '\n';
+                }
             } else {
                 break;
             }
@@ -52,7 +56,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             in_sl_comment = false;
             if (space_cross_line) {
                 input.increase_lineno();
-                output += '\n';
+                if ((keep & SpaceKeepType::eNewLine) != SpaceKeepType::eNothing) { output += '\n'; }
                 if (!in_ml_comment && !in_sl_comment) {
                     input.set_line_start(true);
                 }
@@ -63,7 +67,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         } else if (!std::isspace(first_ch) && !in_ml_comment && !in_sl_comment) {
             break;
         } else {
-            output += ' ';
+            if ((keep & SpaceKeepType::eSpace) != SpaceKeepType::eNothing) { output += ' '; }
         }
         first_ch = input.get_next_ch();
     }

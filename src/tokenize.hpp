@@ -68,6 +68,22 @@ struct Token final {
     std::string_view value;
 };
 
-Token get_next_token(InputState &input, std::string &output, bool space_cross_line = true);
+enum class SpaceKeepType : uint32_t {
+    eSpace = 1,
+    eNewLine = 2,
+    eBackSlash = 4,
+    eAll = 7,
+    eNothing = 0,
+};
+inline SpaceKeepType operator&(SpaceKeepType a, SpaceKeepType b) {
+    return static_cast<SpaceKeepType>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+}
+inline SpaceKeepType operator|(SpaceKeepType a, SpaceKeepType b) {
+    return static_cast<SpaceKeepType>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+Token get_next_token(
+    InputState &input, std::string &output, bool space_cross_line = true, SpaceKeepType keep = SpaceKeepType::eAll
+);
 
 }

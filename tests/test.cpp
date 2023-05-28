@@ -8,7 +8,7 @@ int main() {
 int func() { return 1'000'000'000u; }
 #if defined(FOO) & 0
 void func2() {}
-#elif 1 + 2 * 3 == 9
+#elif 1 + 4 * 5 / 2 / 2 == ((!!0 ? 2 : 1) << 1 | 4)
 struct Foo {
     A<Foo> a;
 };
@@ -17,13 +17,13 @@ struct Foo {
         if (!(expr)) { \
             abort(); \
         } \
-    }
+    } while (0)
 assert(1);
 #define STRINGIFY(x) #x
 #define STRINGIFY_MACRO(x) STRINGIFY(x)
 STRINGIFY(FOO);
 STRINGIFY_MACRO(FOO);
-    )";
+)";
 
     pep::cprep::Preprocesser preprocesser{};
     pep::cprep::EmptyInclude includer{};
