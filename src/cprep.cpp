@@ -86,7 +86,7 @@ struct Preprocesser::Impl final {
         std::string_view input_path,
         std::string_view input_content,
         ShaderIncluder &includer,
-        std::string_view *options,
+        const std::string_view *options,
         size_t num_options
     ) {
         init_states(input_path, input_content);
@@ -120,7 +120,7 @@ struct Preprocesser::Impl final {
         includer->clear();
     }
 
-    void parse_options(std::string_view *options, size_t num_options) {
+    void parse_options(const std::string_view *options, size_t num_options) {
         std::unordered_set<std::string_view> undefines;
 
         auto fetch_and_trim_option = [options](size_t i) {
@@ -173,7 +173,10 @@ struct Preprocesser::Impl final {
 
     void parse_source(Result &result) {
         while (true) {
-            auto token = get_next_token(inputs.top(), result.parsed_result);
+            auto token = get_next_token(
+                inputs.top(), result.parsed_result, true,
+                if_stack.top() == IfState::eTrue ? SpaceKeepType::eAll : SpaceKeepType::eNewLine
+            );
             if (token.type == TokenType::eEof) {
                 inputs.pop();
                 auto top_file = files.top();
@@ -182,7 +185,7 @@ struct Preprocesser::Impl final {
                     break;
                 } else {
                     result.parsed_result += std::format(
-                        "#line {} \"{}\"", top_file.included_by_lineno + 1, top_file.included_by_path
+                        "\n#line {} \"{}\"", top_file.included_by_lineno + 1, top_file.included_by_path
                     );
                 }
             } else if (token.type == TokenType::eUnknown) {
@@ -630,6 +633,37 @@ struct Preprocesser::Impl final {
         inputs.emplace(macro.replace);
 
         // replace macro parameters and __VA_ARGS__, do stringification and concatenation
+        auto append_token = [this, &macro, &args, depth](std::string &str, const Token &token) {
+            if (macro.has_va_params && token.value == "__VA_ARGS__") {
+                for (size_t i = macro.params.size(); i < args.size(); i++) {
+                    if (i > macro.params.size()) {
+                        str += ", ";
+                    }
+                    Define param{
+                        .replace = args[i],
+                        .file = macro.file,
+                        .lineno = macro.lineno,
+                    };
+                    str += replace_macro(token.value, param, true, depth);
+                }
+            } else if (token.type == TokenType::eIdentifier) {
+                if (
+                    auto it = std::find(macro.params.begin(), macro.params.end(), token.value);
+                    it != macro.params.end()
+                ) {
+                    Define param{
+                        .replace = args[it - macro.params.begin()],
+                        .file = macro.file,
+                        .lineno = macro.lineno,
+                    };
+                    str += replace_macro(token.value, param, true, depth);
+                } else {
+                    str += token.value;
+                }
+            } else {
+                str += token.value;
+            }
+        };
         std::string result_phase1{};
         auto token = get_next_token(inputs.top(), result_phase1, true, SpaceKeepType::eSpace);
         std::string spaces{};
@@ -658,7 +692,7 @@ struct Preprocesser::Impl final {
                         )};
                     }
                     for (size_t i = macro.params.size(); i < args.size(); i++) {
-                        result_phase1 += i == macro.params.size() ? '"' : ' ';
+                        result_phase1 += i == macro.params.size() ? "\"" : ", ";
                         result_phase1 += stringify(args[i]);
                     }
                     result_phase1 += '"';
@@ -681,9 +715,9 @@ struct Preprocesser::Impl final {
             if (next_token.type == TokenType::eDoubleSharp) {
                 next_token = get_next_token(inputs.top(), spaces, true, SpaceKeepType::eSpace);
                 if (concat_str.empty()) {
-                    concat_str = token.value;
+                    append_token(concat_str, token);
                 }
-                concat_str += next_token.value;
+                append_token(concat_str, next_token);
                 token = next_token;
                 spaces.clear();
                 continue;
@@ -695,38 +729,7 @@ struct Preprocesser::Impl final {
                 continue;
             }
             // others
-            if (token.type == TokenType::eIdentifier) {
-                if (macro.has_va_params) {
-                    if (token.value == "__VA_ARGS__") {
-                        for (size_t i = macro.params.size(); i < args.size(); i++) {
-                            if (i > macro.params.size()) {
-                                result_phase1 += ", ";
-                            }
-                            Define param{
-                                .replace = args[i],
-                                .file = macro.file,
-                                .lineno = macro.lineno,
-                            };
-                            result_phase1 += replace_macro(token.value, param, true, depth);
-                        }
-                    }
-                }
-                if (
-                    auto it = std::find(macro.params.begin(), macro.params.end(), token.value);
-                    it != macro.params.end()
-                ) {
-                    Define param{
-                        .replace = args[it - macro.params.begin()],
-                        .file = macro.file,
-                        .lineno = macro.lineno,
-                    };
-                    result_phase1 += replace_macro(token.value, param, true, depth);
-                } else {
-                    result_phase1 += token.value;
-                }
-            } else {
-                result_phase1 += token.value;
-            }
+            append_token(result_phase1, token);
             token = next_token;
             result_phase1 += spaces;
             spaces.clear();
@@ -748,7 +751,8 @@ struct Preprocesser::Impl final {
                     token = get_next_token(inputs.top(), result);
                     if (token.type == TokenType::eLeftBracketRound) {
                         size_t num_brackets = 0;
-                        auto opt_true = args.size() > macro.params.size();
+                        auto opt_true = args.size() > macro.params.size()
+                            && (!args[macro.params.size()].empty() || args.size() > macro.params.size() + 1);
                         while (true) {
                             token = get_next_token(inputs.top(), result);
                             if (token.type == TokenType::eEof) {
@@ -822,7 +826,7 @@ Preprocesser::Result Preprocesser::do_preprocess(
     std::string_view input_path,
     std::string_view input_content,
     ShaderIncluder &includer,
-    std::string_view *options,
+    const std::string_view *options,
     size_t num_options
 ) {
     return impl_->do_preprocess(input_path, input_content, includer, options, num_options);

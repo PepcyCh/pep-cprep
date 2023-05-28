@@ -1,6 +1,4 @@
-#include <iostream>
-
-#include <cprep/cprep.hpp>
+#include "common.hpp"
 
 class TestIncluder final : public pep::cprep::ShaderIncluder {
 public:
@@ -19,8 +17,11 @@ public:
     }
 };
 
-int main() {
-    auto in_src = R"(
+bool test1(pep::cprep::Preprocesser &preprocesser, pep::cprep::ShaderIncluder &includer) {
+    auto in_src =
+R"(#ifndef FOO
+#include "a.hpp"
+#endif
 #include "a.hpp"
 #include <a.hpp>
 #define B <b.hpp>
@@ -30,14 +31,46 @@ int main() {
     return 0;
 }
 )";
+    auto expected =
+R"(
 
+
+#line 1 "/a.hpp"
+
+int func_a();
+
+#line 5 "/test.cpp"
+
+
+#line 1 "/b.hpp"
+
+
+int func_b();
+
+
+#line 8 "/test.cpp"
+#line 1 "/b.hpp"
+
+
+
+
+
+#line 9 "/test.cpp"
+int main() {
+    return 0;
+}
+)";
+    std::string_view options[]{"-DFOO=1"};
+    return expect_ok(preprocesser, includer, in_src, expected, options, 1);
+}
+
+int main() {
     pep::cprep::Preprocesser preprocesser{};
     TestIncluder includer{};
 
-    auto result = preprocesser.do_preprocess("/", in_src, includer);
-    std::cout << "result:\n" << result.parsed_result << std::endl;
-    std::cout << "error:\n" << result.error << std::endl;
-    std::cout << "warning:\n" << result.warning << std::endl;
+    auto pass = true;
 
-    return 0;
+    pass &= test1(preprocesser, includer);
+
+    return pass ? 0 : 1;
 }

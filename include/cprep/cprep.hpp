@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <functional>
 
 namespace pep::cprep {
 
@@ -50,7 +49,7 @@ public:
         std::string_view input_path,
         std::string_view input_content,
         ShaderIncluder &includer,
-        std::string_view *options = nullptr,
+        const std::string_view *options = nullptr,
         size_t num_options = 0
     );
 

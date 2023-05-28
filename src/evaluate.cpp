@@ -55,6 +55,7 @@ int64_t str_to_number(std::string_view str) {
     int64_t value = 0.0;
     for (; i < str.size(); i++) {
         if (str[i] == '\'') { continue; }
+        if (!std::isdigit(str[i])) { break; }
         value = value * base + char_to_number(str[i]);
     }
     return value;
@@ -127,6 +128,16 @@ struct Operator final {
     }
 };
 
+int64_t do_unary_op(TokenType op, int64_t a) {
+    switch (op) {
+        case TokenType::eAdd: return a;
+        case TokenType::eSub: return -a;
+        case TokenType::eBNot: return ~a;
+        case TokenType::eLNot: return a ? 0 : 1;
+        default: unreachable();
+    }
+}
+
 int64_t do_binary_op(TokenType op, int64_t a, int64_t b) {
     switch (op) {
         case TokenType::eAdd: return a + b;
@@ -162,6 +173,7 @@ bool evaluate_expression(InputState &input) {
     size_t num_questions = 0;
     std::stack<size_t> num_questions_left_bracket;
     num_questions_left_bracket.push(0);
+    size_t num_unary = 0;
     std::string temp{};
     while (true) {
         auto token = get_next_token(input, temp, false);
@@ -171,14 +183,9 @@ bool evaluate_expression(InputState &input) {
             }
             auto value = str_to_number(token.value);
             while (!ops.empty() && ops.back().is_unary()) {
-                switch (ops.back().op) {
-                    case TokenType::eAdd: break;
-                    case TokenType::eSub: value = -value; break;
-                    case TokenType::eBNot: value = ~value; break;
-                    case TokenType::eLNot: value = value != 0 ? 1 : 0; break;
-                    default: unreachable();
-                }
+                value = do_unary_op(ops.back().op, value);
                 ops.pop_back();
+                --num_unary;
             }
             values.push_back(value);
             prev_is_number = true;
@@ -214,33 +221,40 @@ bool evaluate_expression(InputState &input) {
                     }
                     --num_questions;
                 }
-                size_t start = ops.size();
+                if (op.is_unary()) {
+                    ++num_unary;
+                    ops.push_back(op);
+                    continue;
+                }
+                size_t start = values.size() - 1;
                 // leave ternary op at last
                 while (
-                    start > left_brackets.top() && ops[start - 1].priority > op.priority && ops[start - 1].priority > 1
+                    start > left_brackets.top()
+                    && ops[num_unary + start - 1].priority > op.priority
+                    && ops[num_unary + start - 1].priority > 1
                 ) {
                     --start;
                 }
-                for (size_t i = ops.size(), j = ops.size(); i > start; i--) {
+                for (size_t i = ops.size(), j = ops.size(); i > start + num_unary; i--) {
                     if (i - 1 == start || ops[i - 2].priority != ops[j - 1].priority) {
-                        auto value = values[i - 1];
+                        auto value = values[i - 1 - num_unary];
                         for (size_t k = i; k <= j; k++) {
-                            value = do_binary_op(ops[k - 1].op, value, values[k]);
+                            value = do_binary_op(ops[k - 1].op, value, values[k - num_unary]);
                         }
                         j = i - 1;
-                        values[j] = value;
+                        values[j - num_unary] = value;
                     }
                 }
                 if (op.op == TokenType::eRightBracketRound || op.op == TokenType::eEof) {
                     if (num_questions > num_questions_left_bracket.top()) {
                         throw EvaluateError{"'?' without a ':'"};
                     }
-                    // calc ternary backward
+                    // calc ternary
                     if (start > left_brackets.top()) {
                         std::stack<int64_t> ternary_values;
                         ternary_values.push(values.back());
                         for (size_t i = start; i > left_brackets.top(); i--) {
-                            if (ops[i - 1].op == TokenType::eColon) {
+                            if (ops[num_unary + i - 1].op == TokenType::eColon) {
                                 ternary_values.push(values[i - 1]);
                             } else {
                                 auto t = ternary_values.top();
@@ -252,8 +266,17 @@ bool evaluate_expression(InputState &input) {
                         }
                         values[left_brackets.top()] = ternary_values.top();
                     }
+                    // calc unary
+                    int64_t value = values[left_brackets.top()];
+                    while (!ops.empty() && ops.back().is_unary()) {
+                        value = do_unary_op(ops.back().op, value);
+                        ops.pop_back();
+                        --num_unary;
+                    }
+                    values[left_brackets.top()] = value;
+
                     values.resize(left_brackets.top() + 1);
-                    ops.resize(left_brackets.top());
+                    ops.resize(left_brackets.top() + num_unary);
                     left_brackets.pop();
                     num_questions_left_bracket.pop();
                     if (op.op == TokenType::eEof) { break; }
@@ -261,7 +284,7 @@ bool evaluate_expression(InputState &input) {
                     prev_is_number = true;
                 } else {
                     values.resize(start + 1);
-                    ops.resize(start + 1);
+                    ops.resize(start + 1 + num_unary);
                     ops[start] = op;
                     prev_is_number = false;
                 }

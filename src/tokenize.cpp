@@ -216,10 +216,9 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             exp_start = false;
             if (number_end == input.get_p_end()) { input.skip_next_ch(); }
         }
-        auto number_str = input.get_substr(p_start, number_end);
         if (base == 8) {
-            for (auto ch : number_str) {
-                if (ch == '8' || ch == '9') { return unknown(); }
+            for (auto it = p_start; it != number_end; it++) {
+                if (*it == '8' || *it == '9') { return unknown(); }
             }
         }
         auto remaining = input.get_substr_to_end(number_end);
@@ -243,6 +242,8 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             }
         }
         input.skip_chars(match_len);
+        number_end += match_len;
+        auto number_str = input.get_substr(p_start, number_end);
         return {TokenType::eNumber, number_str};
     } else if (first_ch == '(') {
         return {TokenType::eLeftBracketRound, input.get_substr_to_curr(p_start)};

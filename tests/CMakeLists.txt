@@ -1,0 +1,10 @@
+function(add_cprep_test test_name)
+    add_executable(cprep-${test_name} ${test_name}.cpp)
+    target_link_libraries(cprep-${test_name} PRIVATE pep-cprep)
+    add_test(cprep-${test_name} cprep-${test_name})
+endfunction()
+
+add_cprep_test(test_calc)
+add_cprep_test(test_include)
+add_cprep_test(test_replace)
+add_cprep_test(test_other)
