@@ -476,7 +476,7 @@ struct Preprocesser::Impl final {
                     )};
                 }
                 if_stack.pop();
-            } else if (unknown_directive) {
+            } else if (unknown_directive && if_stack.top() == IfState::eTrue) {
                 add_warning(result, std::format(
                     "at file '{}' line {}, unknown directive '{}'",
                     files.top().path, input.get_lineno(), token.value

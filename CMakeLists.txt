@@ -22,6 +22,8 @@ target_include_directories(pep-cprep PUBLIC include)
 
 
 if(CPREP_BUILD_TESTS)
-    add_executable(cprep-test tests/test.cpp)
-    target_link_libraries(cprep-test PRIVATE pep-cprep)
+    add_executable(cprep-test-1 tests/test1.cpp)
+    target_link_libraries(cprep-test-1 PRIVATE pep-cprep)
+    add_executable(cprep-test-2 tests/test2.cpp)
+    target_link_libraries(cprep-test-2 PRIVATE pep-cprep)
 endif()
