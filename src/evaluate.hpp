@@ -10,4 +10,6 @@ struct EvaluateError final {
 
 bool evaluate_expression(InputState &input);
 
+int64_t str_to_number(std::string_view str);
+
 }

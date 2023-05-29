@@ -35,6 +35,7 @@ Supported directives
 * `error`, `warning`
 * `include`
 * `pragma once`
+* `line`
 
 Supported features
 * basic object-like and function-like macro, stringification `#` and concatenation `##`
@@ -43,3 +44,5 @@ Supported features
 * variable number of parameters, `__VA_ARGS__`, `__VA_OPT__`
 * allow single `'` between numbers in integer or floating-point litteral
 * customized include handler
+
+Currently only ASCII input is acceptable. UTF-8 input will be supported in the future.

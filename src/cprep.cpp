@@ -208,9 +208,11 @@ struct Preprocesser::Impl final {
                     if (auto it = defines.find(token.value); it != defines.end()) {
                         result.parsed_result += replace_macro(token.value, it->second);
                     } else if (token.value == "__FILE__") {
+                        result.parsed_result += '"';
                         result.parsed_result += files.top().path;
+                        result.parsed_result += '"';
                     } else if (token.value == "__LINE__") {
-                        result.parsed_result += inputs.top().get_lineno();
+                        result.parsed_result += std::to_string(inputs.top().get_lineno());
                     } else {
                         result.parsed_result += token.value;
                     }
@@ -244,6 +246,7 @@ struct Preprocesser::Impl final {
             // not conditional directives
             // - error, warning
             // - pragma
+            // - line
             // - define, undef
             // - include
             if (if_stack.top() == IfState::eTrue) {
@@ -284,6 +287,41 @@ struct Preprocesser::Impl final {
                             files.top().path, input.get_lineno(), token.value
                         ));
                     }
+                    unknown_directive = false;
+                } else if (token.value == "line") {
+                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    if (token.type != TokenType::eNumber) {
+                        throw PreprocessError{std::format(
+                            "at file '{}' line {}, #line directive requires a positive integer argument\n",
+                            files.top().path, input.get_lineno()
+                        )};
+                    }
+                    int64_t line;
+                    try {
+                        line = str_to_number(token.value);
+                    } catch (const EvaluateError &e) {
+                        throw PreprocessError{std::format(
+                            "at file '{}' line {}, #line directive requires a positive integer argument\n",
+                            files.top().path, input.get_lineno()
+                        )};
+                    }
+                    if (line <= 0) {
+                        throw PreprocessError{std::format(
+                            "at file '{}' line {}, #line directive requires a positive integer argument\n",
+                            files.top().path, input.get_lineno()
+                        )};
+                    }
+                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    if (token.type != TokenType::eEof) {
+                        if (token.type != TokenType::eString) {
+                            throw PreprocessError{std::format(
+                                "at file '{}' line {}, Invalid filename for #line directive\n",
+                                files.top().path, input.get_lineno()
+                            )};
+                        }
+                        files.top().path = token.value.substr(1, token.value.size() - 2);
+                    }
+                    input.set_lineno(line - 1);
                     unknown_directive = false;
                 } else if (token.value == "include") {
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
@@ -677,39 +715,41 @@ struct Preprocesser::Impl final {
                 inputs.pop();
                 throw PreprocessError{std::format("{}, failed to parse a valid token", err_loc)};
             }
-            // stringify
-            if (token.type == TokenType::eSharp) {
-                if (next_token.type != TokenType::eIdentifier) {
-                    inputs.pop();
-                    throw PreprocessError{std::format("{}, expected a macro parameter after '#'", err_loc)};
-                }
-                if (next_token.value == "__VA_ARGS__") {
-                    if (!macro.has_va_params) {
+            // stringify, only when macro is function-like
+            if (macro.function_like) {
+                if (token.type == TokenType::eSharp) {
+                    if (next_token.type != TokenType::eIdentifier) {
                         inputs.pop();
-                        throw PreprocessError{std::format(
-                            "{}, '__VA_ARGS__' is used after '#' but macro doesn't have variable number of paramters",
-                            err_loc
-                        )};
+                        throw PreprocessError{std::format("{}, expected a macro parameter after '#'", err_loc)};
                     }
-                    for (size_t i = macro.params.size(); i < args.size(); i++) {
-                        result_phase1 += i == macro.params.size() ? "\"" : ", ";
-                        result_phase1 += stringify(args[i]);
+                    if (next_token.value == "__VA_ARGS__") {
+                        if (!macro.has_va_params) {
+                            inputs.pop();
+                            throw PreprocessError{std::format(
+                                "{}, '__VA_ARGS__' is used after '#' but macro doesn't have variable number of paramters",
+                                err_loc
+                            )};
+                        }
+                        for (size_t i = macro.params.size(); i < args.size(); i++) {
+                            result_phase1 += i == macro.params.size() ? "\"" : ", ";
+                            result_phase1 += stringify(args[i]);
+                        }
+                        result_phase1 += '"';
+                    } else {
+                        auto it = std::find(macro.params.begin(), macro.params.end(), next_token.value);
+                        if (it == macro.params.end()) {
+                            inputs.pop();
+                            throw PreprocessError{std::format(
+                                "{}, expected a macro parameter after '#'",
+                                err_loc
+                            )};
+                        }
+                        result_phase1 += '"' + stringify(args[it - macro.params.begin()]) + '"';
                     }
-                    result_phase1 += '"';
-                } else {
-                    auto it = std::find(macro.params.begin(), macro.params.end(), next_token.value);
-                    if (it == macro.params.end()) {
-                        inputs.pop();
-                        throw PreprocessError{std::format(
-                            "{}, expected a macro parameter after '#'",
-                            err_loc
-                        )};
-                    }
-                    result_phase1 += '"' + stringify(args[it - macro.params.begin()]) + '"';
+                    token = get_next_token(inputs.top(), result_phase1, true, SpaceKeepType::eSpace);
+                    spaces.clear();
+                    continue;
                 }
-                token = get_next_token(inputs.top(), result_phase1, true, SpaceKeepType::eSpace);
-                spaces.clear();
-                continue;
             }
             // concat
             if (next_token.type == TokenType::eDoubleSharp) {

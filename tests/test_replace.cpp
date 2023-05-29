@@ -4,10 +4,14 @@ bool test1(pep::cprep::Preprocesser &preprocesser, pep::cprep::ShaderIncluder &i
     auto in_src =
 R"(#define FOO(a, b, c) a ## b # c
 FOO(xyz, 123, str);
+#define BAR # c
+BAR;
 )";
     auto expected =
 R"(
 xyz123 "str";
+
+# c;
 )";
     return expect_ok(preprocesser, includer, in_src, expected, nullptr, 0);
 }

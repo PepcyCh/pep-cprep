@@ -25,42 +25,6 @@ int char_to_number(char ch) {
     }
 }
 
-int64_t str_to_number(std::string_view str) {
-    int64_t base = 10;
-    auto is_floating = str.find('.') != std::string_view::npos
-        || (!str.starts_with("0x") && str.find_first_of("eE") != std::string_view::npos)
-        || (str.starts_with("0x") && str.find_first_of("pP") != std::string_view::npos);
-    if (is_floating) {
-        throw EvaluateError{"floating point literal in preprocessor expression."};
-    }
-    size_t i = 0;
-    if (str[0] == '0') {
-        if (str.size() == 1) { return 0; }
-        if (str[1] == 'x') {
-            base = 16;
-            i = 2;
-        } else if (str[1] == 'b') {
-            base = 2;
-            i = 2;
-        } else if (std::isdigit(str[1])) {
-            base = 8;
-            i = 2;
-        } else if (str[1] == '\'' && std::isdigit(str[2])) {
-            base = 8;
-            i = 3;
-        } else {
-            i = 1;
-        }
-    }
-    int64_t value = 0.0;
-    for (; i < str.size(); i++) {
-        if (str[i] == '\'') { continue; }
-        if (!std::isdigit(str[i])) { break; }
-        value = value * base + char_to_number(str[i]);
-    }
-    return value;
-}
-
 struct Operator final {
     TokenType op;
     // 0 - , ( )
@@ -162,6 +126,42 @@ int64_t do_binary_op(TokenType op, int64_t a, int64_t b) {
     }
 }
 
+}
+
+int64_t str_to_number(std::string_view str) {
+    int64_t base = 10;
+    auto is_floating = str.find('.') != std::string_view::npos
+        || (!str.starts_with("0x") && str.find_first_of("eE") != std::string_view::npos)
+        || (str.starts_with("0x") && str.find_first_of("pP") != std::string_view::npos);
+    if (is_floating) {
+        throw EvaluateError{"floating point literal in preprocessor expression."};
+    }
+    size_t i = 0;
+    if (str[0] == '0') {
+        if (str.size() == 1) { return 0; }
+        if (str[1] == 'x') {
+            base = 16;
+            i = 2;
+        } else if (str[1] == 'b') {
+            base = 2;
+            i = 2;
+        } else if (std::isdigit(str[1])) {
+            base = 8;
+            i = 2;
+        } else if (str[1] == '\'' && std::isdigit(str[2])) {
+            base = 8;
+            i = 3;
+        } else {
+            i = 1;
+        }
+    }
+    int64_t value = 0.0;
+    for (; i < str.size(); i++) {
+        if (str[i] == '\'') { continue; }
+        if (!std::isdigit(str[i])) { break; }
+        value = value * base + char_to_number(str[i]);
+    }
+    return value;
 }
 
 bool evaluate_expression(InputState &input) {

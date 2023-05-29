@@ -17,6 +17,7 @@ public:
     bool is_end() const { return p_curr_ == p_end_; }
 
     void increase_lineno() { ++lineno_; col_ = 0; }
+    void set_lineno(size_t lineno) { lineno_ = lineno; }
     void set_line_start(bool line_start) { line_start_ = line_start; }
 
     char look_next_ch() const;

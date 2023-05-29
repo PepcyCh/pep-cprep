@@ -28,7 +28,10 @@ inline bool expect_ok(
     auto pass = result.parsed_result == expected && result.error.empty() && result.warning.empty();
     if (!pass) {
         std::cout << "expected ('@' marks the end of line):\n" << show_space(expected)
-            << "\nget ('@' marks the end of line):\n" << show_space(result.parsed_result) << std::endl;
+            << "\nget ('@' marks the end of line):\n" << show_space(result.parsed_result)
+            << "\nerror:\n" << result.error
+            << "\narning:\n" << result.warning
+            << std::endl;
     }
     return pass;
 }
