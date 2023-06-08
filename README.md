@@ -21,15 +21,15 @@ public:
     }
 };
 
-pep::cprep::Preprocessor Preprocessor{};
+pep::cprep::Preprocessor preprocessor{};
 TestIncluder includer{};
 auto in_src_path = "foo.cpp";
 auto in_src_count = read_all_from_file(in_src_path);
-auto result = Preprocessor.do_preprocess(in_src_path, in_src_content, includer);
+auto result = preprocessor.do_preprocess(in_src_path, in_src_content, includer);
 
-result.parsed_result;
-result.error;
-result.warning;
+std::cout << result.parsed_result << std::endl;
+std::cout << result.error << std::endl;
+std::cout << result.warning << std::endl;
 ```
 
 ## Features
