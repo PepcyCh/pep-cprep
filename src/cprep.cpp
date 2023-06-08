@@ -149,7 +149,7 @@ struct Preprocesser::Impl final {
                 if (eq + 1 >= opt_e) {
                     def.replace = "";
                 } else {
-                    def.replace = std::string_view{eq + 1, opt_e};
+                    def.replace = make_string_view(eq + 1, opt_e);
                 }
                 defines.insert({name, def});
             } else if (*opt_b == 'U') {
@@ -349,7 +349,7 @@ struct Preprocesser::Impl final {
                         while (true) {
                             auto ch = header_input->look_next_ch();
                             if (ch == '>') {
-                                header_name = std::string_view{start, header_input->get_p_curr()};
+                                header_name = make_string_view(start, header_input->get_p_curr());
                                 header_input->skip_next_ch();
                                 break;
                             } else if (ch == EOF || ch == '\n') {

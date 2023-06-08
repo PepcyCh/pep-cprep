@@ -42,20 +42,20 @@ void InputState::unget_chars(size_t count) {
 std::string_view InputState::get_substr(
     std::string_view::const_iterator p_start, std::string_view::const_iterator p_end
 ) const {
-    return std::string_view{p_start, p_end};
+    return make_string_view(p_start, p_end);
 }
 
 std::string_view InputState::get_substr(std::string_view::const_iterator p_start, size_t count) const {
     auto real_count = std::min<size_t>(count, p_end_ - p_start);
-    return std::string_view{p_start, p_start + real_count};
+    return make_string_view(p_start, p_start + real_count);
 }
 
 std::string_view InputState::get_substr_to_end(std::string_view::const_iterator p_start) const {
-    return std::string_view{p_start, p_end_};
+    return make_string_view(p_start, p_end_);
 }
 
 std::string_view InputState::get_substr_to_curr(std::string_view::const_iterator p_start) const {
-    return std::string_view{p_start, p_curr_};
+    return make_string_view(p_start, p_curr_);
 }
 
 }

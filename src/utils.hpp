@@ -4,6 +4,25 @@
 
 namespace pep::cprep {
 
+// for compiler that doesn't support std::string_view{first, last} ctor
+template<class T>
+constexpr T *cprep_to_address(T *p) noexcept {
+    static_assert(!std::is_function_v<T>);
+    return p;
+}
+template<class T>
+constexpr auto cprep_to_address(const T &p) noexcept {
+    if constexpr (requires{ std::pointer_traits<T>::to_address(p); }) {
+        return std::pointer_traits<T>::to_address(p);
+    } else {
+        return cprep_to_address(p.operator->());
+    }
+}
+template <typename It, typename End>
+constexpr std::string_view make_string_view(It first, End last) {
+    return std::string_view{cprep_to_address(first), static_cast<std::string_view::size_type>(last - first)};
+}
+
 class InputState final {
 public:
     InputState(std::string_view str) : p_curr_(str.begin()), p_end_(str.end()) {}
