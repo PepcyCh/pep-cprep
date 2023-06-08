@@ -1,7 +1,6 @@
 #include "evaluate.hpp"
 
 #include <vector>
-#include <format>
 #include <stack>
 #include <variant>
 #include <cmath>
@@ -87,7 +86,7 @@ struct Operator final {
             case TokenType::eEof: // treat eof as )
                 return {token.type, 0u};
             default:
-                throw EvaluateError{std::format("operator '{}' not allowed here", token.value)};
+                throw EvaluateError{concat("operator '", token.value, "' not allowed here")};
         }
     }
 };
@@ -179,7 +178,7 @@ bool evaluate_expression(InputState &input) {
         auto token = get_next_token(input, temp, false);
         if (token.type == TokenType::eNumber) {
             if (prev_is_number) {
-                throw EvaluateError{std::format("expected an operator after a number")};
+                throw EvaluateError{"expected an operator after a number"};
             }
             auto value = str_to_number(token.value);
             while (!ops.empty() && ops.back().is_unary()) {

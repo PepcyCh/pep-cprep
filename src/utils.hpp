@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 
 namespace pep::cprep {
@@ -22,6 +23,31 @@ template <typename It, typename End>
 constexpr std::string_view make_string_view(It first, End last) {
     return std::string_view{cprep_to_address(first), static_cast<std::string_view::size_type>(last - first)};
 }
+
+
+inline size_t string_length_of(const char *s) { return std::strlen(s); }
+inline size_t string_length_of(std::string_view s) { return s.size(); }
+inline size_t string_length_of(const std::string &s) { return s.size(); }
+inline size_t string_length_of(std::string &&s) { return s.size(); }
+template <typename... StringLike>
+std::string concat_string(StringLike &&... args) {
+    std::string s{};
+    auto size = ((string_length_of(std::forward<StringLike>(args))) + ...);
+    s.reserve(size);
+    ((s += std::forward<StringLike>(args)), ...);
+    return s;
+}
+inline const char *to_string_like(const char *s) { return s; }
+inline std::string_view to_string_like(std::string_view s) { return s; }
+inline const std::string &to_string_like(const std::string &s) { return s; }
+inline std::string &&to_string_like(std::string &&s) { return std::move(s); }
+template <typename T> requires requires (T a) { std::to_string(a); }
+std::string to_string_like(const T &v) { return std::to_string(v); }
+template <typename... Args>
+std::string concat(Args &&... args) {
+    return concat_string(to_string_like(std::forward<Args>(args))...);
+}
+
 
 class InputState final {
 public:

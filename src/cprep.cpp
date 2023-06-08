@@ -3,10 +3,10 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <stack>
-#include <format>
 
 #include "tokenize.hpp"
 #include "evaluate.hpp"
+#include "utils.hpp"
 
 namespace pep::cprep {
 
@@ -209,15 +209,16 @@ struct Preprocesser::Impl final {
                 if (files.empty()) {
                     break;
                 } else {
-                    result.parsed_result += std::format(
-                        "\n#line {} \"{}\"", top_file.included_by_lineno + 1, top_file.included_by_path
+                    result.parsed_result += concat(
+                        "\n#line ", top_file.included_by_lineno + 1,
+                        " \"", top_file.included_by_path, "\""
                     );
                 }
             } else if (token.type == TokenType::eUnknown) {
                 result.parsed_result += token.value;
-                add_error(result, std::format(
-                    "at file '{}' line {}, failed to parse a valid token",
-                    files.top().path, inputs.top().get_lineno()
+                add_error(result, concat(
+                    "at file '", files.top().path, "' line ", inputs.top().get_lineno(),
+                    ", failed to parse a valid token"
                 ));
                 inputs.top().set_line_start(false);
                 continue;
@@ -257,9 +258,9 @@ struct Preprocesser::Impl final {
         auto token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
         if (token.type != TokenType::eIdentifier) {
             if (token.type != TokenType::eEof) {
-                throw PreprocessError{std::format(
-                    "at file '{}' line {}, expected an identifier after '#'",
-                    files.top().path, input.get_lineno()
+                throw PreprocessError{concat(
+                    "at file '", files.top().path, "' line ", input.get_lineno(),
+                    ", expected an identifier after '#'"
                 )};
             }
             return;
@@ -286,63 +287,65 @@ struct Preprocesser::Impl final {
                         message += token.value;
                     }
                     if (token.value == "error") {
-                        add_error(result, std::format(
-                            "at file '{}' line {}, {}\n",
-                            files.top().path, input.get_lineno(), message
+                        add_error(result, concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", ", message, "\n"
                         ));
                     } else {
-                        add_warning(result, std::format(
-                            "at file '{}' line {}, {}\n",
-                            files.top().path, input.get_lineno(), message
+                        add_warning(result, concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", ", message, "\n"
                         ));
                     }
                 } else if (token.value == "pragma") {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, expected an identifier after 'pragma'\n",
-                            files.top().path, input.get_lineno()
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", expected an identifier after 'pragma'\n"
                         )};
                     }
                     if (token.value == "once") {
                         pragma_once_files.insert(files.top().path);
                     } else {
-                        add_warning(result, std::format(
-                            "at file '{}' line {}, unknown pragma '{}'\n",
-                            files.top().path, input.get_lineno(), token.value
+                        add_warning(result, concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", unknown pragma '", token.value, "'\n"
                         ));
+                        result.parsed_result += "#pragma ";
+                        result.parsed_result += token.value;
                     }
                 } else if (token.value == "line") {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eNumber) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, #line directive requires a positive integer argument\n",
-                            files.top().path, input.get_lineno()
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", #line directive requires a positive integer argument\n"
                         )};
                     }
                     int64_t line;
                     try {
                         line = str_to_number(token.value);
                     } catch (const EvaluateError &e) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, #line directive requires a positive integer argument\n",
-                            files.top().path, input.get_lineno()
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", #line directive requires a positive integer argument\n"
                         )};
                     }
                     if (line <= 0) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, #line directive requires a positive integer argument\n",
-                            files.top().path, input.get_lineno()
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", #line directive requires a positive integer argument\n"
                         )};
                     }
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eEof) {
                         if (token.type != TokenType::eString) {
-                            throw PreprocessError{std::format(
-                                "at file '{}' line {}, Invalid filename for #line directive\n",
-                                files.top().path, input.get_lineno()
+                            throw PreprocessError{concat(
+                                "at file '", files.top().path, "' line ", input.get_lineno(),
+                                ", Invalid filename for #line directive\n"
                             )};
                         }
                         files.top().path = token.value.substr(1, token.value.size() - 2);
@@ -362,9 +365,9 @@ struct Preprocesser::Impl final {
                             macro_input = InputState{macro_replaced};
                             header_input = &macro_input;
                         } else {
-                            throw PreprocessError{std::format(
-                                "at file '{}' line {}, expected a header file name\n",
-                                files.top().path, input.get_lineno()
+                            throw PreprocessError{concat(
+                                "at file '", files.top().path, "' line ", input.get_lineno(),
+                                ", expected a header file name\n"
                             )};
                         }
                         token = get_next_token(*header_input, result.parsed_result, false, SpaceKeepType::eNewLine);
@@ -381,17 +384,17 @@ struct Preprocesser::Impl final {
                                 header_input->skip_next_ch();
                                 break;
                             } else if (ch == EOF || ch == '\n') {
-                                throw PreprocessError{std::format(
-                                    "at file '{}' line {}, expected a header file name\n",
-                                    files.top().path, input.get_lineno()
+                                throw PreprocessError{concat(
+                                    "at file '", files.top().path, "' line ", input.get_lineno(),
+                                    ", expected a header file name\n"
                                 )};
                             }
                             header_input->skip_next_ch();
                         }
                     } else {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, expected a header file name\n",
-                            files.top().path, input.get_lineno()
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", expected a header file name\n"
                         )};
                     }
                     ShaderIncluder::Result include_result{};
@@ -403,7 +406,7 @@ struct Preprocesser::Impl final {
                                 *it, include_result.header_content,
                                 files.top().path, input.get_lineno(),
                             });
-                            result.parsed_result += std::format("#line 1 \"{}\"\n", *it);
+                            result.parsed_result += concat("#line 1 \"", *it, "\"\n");
                             inputs.emplace(include_result.header_content);
                         }
                     } else {
@@ -411,18 +414,18 @@ struct Preprocesser::Impl final {
                         result.parsed_result += del_is_quot ? '"' : '<';
                         result.parsed_result += header_name;
                         result.parsed_result += del_is_quot ? '"' : '>';
-                        add_warning(result, std::format(
-                            "at file '{}' line {}, failed to include header '{}'\n",
-                            files.top().path, input.get_lineno(), header_name
+                        add_warning(result, concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", failed to include header '", header_name, "'\n"
                         ));
                     }
                 } else if (token.value == "define") {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, expected an identifier after 'define'\n",
-                            files.top().path, input.get_lineno()
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", expected an identifier after 'define'\n"
                         )};
                     }
                     Define macro{
@@ -439,24 +442,24 @@ struct Preprocesser::Impl final {
                             macro.has_va_params = token.type == TokenType::eTripleDots;
                             if (token.type == TokenType::eRightBracketRound) { break; }
                             if (token.type != TokenType::eIdentifier && token.type != TokenType::eTripleDots) {
-                                throw PreprocessError{std::format(
-                                    "at file '{}' line {}, expected an identifier or '...' when defining macro paramter\n",
-                                    files.top().path, input.get_lineno()
+                                throw PreprocessError{concat(
+                                    "at file '", files.top().path, "' line ", input.get_lineno(),
+                                    ", expected an identifier or '...' when defining macro paramter\n"
                                 )};
                             }
                             if (!macro.has_va_params) { macro.params.push_back(token.value); }
                             token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                             if (token.type == TokenType::eRightBracketRound) { break; }
                             if (token.type != TokenType::eComma) {
-                                throw PreprocessError{std::format(
-                                    "at file '{}' line {}, expected ',' or ')' after a macro paramter\n",
-                                    files.top().path, input.get_lineno()
+                                throw PreprocessError{concat(
+                                    "at file '", files.top().path, "' line ", input.get_lineno(),
+                                    ", expected ',' or ')' after a macro paramter\n"
                                 )};
                             }
                             if (macro.has_va_params) {
-                                throw PreprocessError{std::format(
-                                    "at file '{}' line {}, '...' must be the last macro paramter\n",
-                                    files.top().path, input.get_lineno()
+                                throw PreprocessError{concat(
+                                    "at file '", files.top().path, "' line ", input.get_lineno(),
+                                    ", '...' must be the last macro paramter\n"
                                 )};
                             }
                         }
@@ -472,9 +475,9 @@ struct Preprocesser::Impl final {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, expected an identifier after 'undef'\n",
-                            files.top().path, input.get_lineno()
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", expected an identifier after 'undef'\n"
                         )};
                     }
                     if (auto it = defines.find(token.value); it != defines.end()) {
@@ -494,9 +497,9 @@ struct Preprocesser::Impl final {
                     auto is_ifdef = token.value == "ifdef";
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, expected an identifier after '{}'\n",
-                            files.top().path, input.get_lineno(), token.value
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", expected an identifier after '", token.value, "'\n"
                         )};
                     }
                     if_stack.push(if_state_from_bool(is_ifdef == defines.contains(token.value)));
@@ -513,26 +516,26 @@ struct Preprocesser::Impl final {
             } else if (token.value == "else") {
                 unknown_directive = false;
                 if (if_stack.size() == 1) {
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, '#else' without '#if'",
-                        files.top().path, input.get_lineno()
+                    throw PreprocessError{concat(
+                        "at file '", files.top().path, "' line ", input.get_lineno(),
+                        ", '#else' without '#if'"
                     )};
                 }
                 if_stack.top() = if_state_else(if_stack.top());
             } else if (token.value == "elifdef" || token.value == "elifndef") {
                 if (if_stack.size() == 1) {
                 unknown_directive = false;
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, '{}' without '#if'",
-                        files.top().path, input.get_lineno(), token.value
+                    throw PreprocessError{concat(
+                        "at file '", files.top().path, "' line ", input.get_lineno(),
+                        ", '", token.value, "' without '#if'"
                     )};
                 }
                 if (if_stack.top() == IfState::eFalseWithoutTrueBefore) {
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{std::format(
-                            "at file '{}' line {}, expected an identifier after '{}'\n",
-                            files.top().path, input.get_lineno(), token.value
+                        throw PreprocessError{concat(
+                            "at file '", files.top().path, "' line ", input.get_lineno(),
+                            ", expected an identifier after '", token.value, "'\n"
                         )};
                     }
                     if_stack.top() = if_state_from_bool((token.value == "elifdef") == defines.contains(token.value));
@@ -542,9 +545,9 @@ struct Preprocesser::Impl final {
             } else if (token.value == "elif") {
                 unknown_directive = false;
                 if (if_stack.size() == 1) {
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, '#elif' without '#if'",
-                        files.top().path, input.get_lineno()
+                    throw PreprocessError{concat(
+                        "at file '", files.top().path, "' line ", input.get_lineno(),
+                        ", '#elif' without '#if'"
                     )};
                 }
                 if (if_stack.top() == IfState::eFalseWithoutTrueBefore) {
@@ -555,18 +558,18 @@ struct Preprocesser::Impl final {
             } else if (token.value == "endif") {
                 unknown_directive = false;
                 if (if_stack.size() == 1) {
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, '#endif' without '#if'",
-                        files.top().path, input.get_lineno()
+                    throw PreprocessError{concat(
+                        "at file '", files.top().path, "' line ", input.get_lineno(),
+                        ", '#endif' without '#if'"
                     )};
                 }
                 if_stack.pop();
             } else if (unknown_directive && if_stack.top() == IfState::eTrue) {
                 result.parsed_result += '#';
                 result.parsed_result += token.value;
-                add_warning(result, std::format(
-                    "at file '{}' line {}, unknown directive '{}'",
-                    files.top().path, input.get_lineno(), token.value
+                add_warning(result, concat(
+                    "at file '", files.top().path, "' line ", input.get_lineno(),
+                    ", unknown directive '", token.value, "'"
                 ));
             }
         } catch (const PreprocessError &e) {
@@ -589,14 +592,14 @@ struct Preprocesser::Impl final {
 
     bool evaluate() {
         std::string replaced{};
-        auto err_loc = std::format("at file '{}' line {}", files.top().path, inputs.top().get_lineno());
+        auto err_loc = concat("at file '", files.top().path, "' line ", inputs.top().get_lineno());
 
         // replace macro and defined()
         while (true) {
             auto token = get_next_token(inputs.top(), replaced, false);
             if (token.type == TokenType::eEof) { break; }
             if (token.type == TokenType::eUnknown) {
-                throw PreprocessError{std::format("{}, failed to parse a valid token", err_loc)};
+                throw PreprocessError{concat(err_loc, ", failed to parse a valid token")};
             }
             if (token.type == TokenType::eIdentifier) {
                 if (auto it = defines.find(token.value); it != defines.end()) {
@@ -608,18 +611,18 @@ struct Preprocesser::Impl final {
                         value = defines.contains(token.value);
                     } else {
                         if (token.type != TokenType::eLeftBracketRound) {
-                            throw PreprocessError{std::format(
-                                "{}, expected a '(' or an identifier after 'defined'", err_loc
+                            throw PreprocessError{concat(
+                                err_loc, ", expected a '(' or an identifier after 'defined'"
                             )};
                         }
                         token = get_next_token(inputs.top(), replaced, false);
                         if (token.type != TokenType::eIdentifier) {
-                            throw PreprocessError{std::format("{}, expected an identifier inside 'defined'", err_loc)};
+                            throw PreprocessError{concat(err_loc, ", expected an identifier inside 'defined'")};
                         }
                         value = defines.contains(token.value);
                         token = get_next_token(inputs.top(), replaced, false);
                         if (token.type != TokenType::eRightBracketRound) {
-                            throw PreprocessError{std::format("{}, expected a ')' after 'defined'", err_loc)};
+                            throw PreprocessError{concat(err_loc, ", expected a ')' after 'defined'")};
                         }
                     }
                     replaced += value ? "1" : "0";
@@ -639,7 +642,7 @@ struct Preprocesser::Impl final {
             InputState input{replaced};
             return evaluate_expression(input);
         } catch (const EvaluateError &e) {
-            throw PreprocessError{std::format("{}, {}", err_loc, e.msg)};
+            throw PreprocessError{concat(err_loc, ", ", e.msg)};
         }
     }
 
@@ -670,16 +673,16 @@ struct Preprocesser::Impl final {
             while (true) {
                 token = get_next_token(inputs.top(), fallback);
                 if (token.type == TokenType::eEof) {
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, when replacing function-like macro '{}', "
-                        "find end of input before finding corresponding ')'",
-                        curr_file, curr_line, macro_name
+                    throw PreprocessError{concat(
+                        "at file '", curr_file, "' line ", curr_line,
+                        ", when replacing function-like macro '", macro_name, "', "
+                        "find end of input before finding corresponding ')'"
                     )};
                 }
                 if (token.type == TokenType::eUnknown) {
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, when replacing function-like macro '{}', failed to parse a valid token",
-                        curr_file, curr_line, macro_name
+                    throw PreprocessError{concat(
+                        "at file '", curr_file, "' line ", curr_line,
+                        ", when replacing function-like macro '", macro_name, "', failed to parse a valid token"
                     )};
                 }
                 if (token.type == TokenType::eLeftBracketRound) {
@@ -703,26 +706,27 @@ struct Preprocesser::Impl final {
             }
             if (macro.has_va_params) {
                 if (args.size() < macro.params.size()) {
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, when replacing function-like macro '{}', "
-                        "the macro needs at least {} arguments but {} are given",
-                        curr_file, curr_line, macro_name, macro.params.size(), args.size()
+                    throw PreprocessError{concat(
+                        "at file '", curr_file, "' line ", curr_line,
+                        ", when replacing function-like macro '", macro_name, "', "
+                        "the macro needs at least ", macro.params.size(), " arguments but ", args.size(), " are given"
                     )};
                 }
             } else {
                 if (args.size() != macro.params.size()) {
-                    throw PreprocessError{std::format(
-                        "at file '{}' line {}, when replacing function-like macro '{}', "
-                        "the macro needs {} arguments but {} are given",
-                        curr_file, curr_line, macro_name, macro.params.size(), args.size()
+                    throw PreprocessError{concat(
+                        "at file '", curr_file, "' line ", curr_line,
+                        ", when replacing function-like macro '", macro_name, "', "
+                        "the macro needs ", macro.params.size(), " arguments but ", args.size(), " are given"
                     )};
                 }
             }
         }
 
-        auto err_loc = std::format(
-            "at file '{}' line {}, when replacing macro{} '{}' (defined at file '{}' line {})",
-            curr_file, curr_line, is_param ? " parameter" : "", macro_name, macro.file, macro.lineno
+        auto err_loc = concat(
+            "at file '", curr_file, "' line ", curr_line,
+            ", when replacing macro ", (is_param ? "parameter" : ""), "'", macro_name,
+            "' (defined at file '", macro.file, "' line ", macro.lineno, ")"
         );
         inputs.emplace(macro.replace);
 
@@ -769,21 +773,21 @@ struct Preprocesser::Impl final {
                 break;
             } else if (token.type == TokenType::eUnknown) {
                 inputs.pop();
-                throw PreprocessError{std::format("{}, failed to parse a valid token", err_loc)};
+                throw PreprocessError{concat(err_loc, ", failed to parse a valid token")};
             }
             // stringify, only when macro is function-like
             if (macro.function_like) {
                 if (token.type == TokenType::eSharp) {
                     if (next_token.type != TokenType::eIdentifier) {
                         inputs.pop();
-                        throw PreprocessError{std::format("{}, expected a macro parameter after '#'", err_loc)};
+                        throw PreprocessError{concat(err_loc, ", expected a macro parameter after '#'")};
                     }
                     if (next_token.value == "__VA_ARGS__") {
                         if (!macro.has_va_params) {
                             inputs.pop();
-                            throw PreprocessError{std::format(
-                                "{}, '__VA_ARGS__' is used after '#' but macro doesn't have variable number of paramters",
-                                err_loc
+                            throw PreprocessError{concat(
+                                err_loc,
+                                ", '__VA_ARGS__' is used after '#' but macro doesn't have variable number of paramters"
                             )};
                         }
                         for (size_t i = macro.params.size(); i < args.size(); i++) {
@@ -795,9 +799,8 @@ struct Preprocesser::Impl final {
                         auto it = std::find(macro.params.begin(), macro.params.end(), next_token.value);
                         if (it == macro.params.end()) {
                             inputs.pop();
-                            throw PreprocessError{std::format(
-                                "{}, expected a macro parameter after '#'",
-                                err_loc
+                            throw PreprocessError{concat(
+                                err_loc, ", expected a macro parameter after '#'"
                             )};
                         }
                         result_phase1 += '"' + stringify(args[it - macro.params.begin()]) + '"';
@@ -882,10 +885,10 @@ struct Preprocesser::Impl final {
     }
 
     void add_error(Result &result, std::string_view msg) {
-        result.error += std::format("error: {}\n", msg);
+        result.error += concat("error: ", msg, "\n");
     }
     void add_warning(Result &result, std::string_view msg) {
-        result.warning += std::format("warning: {}\n", msg);
+        result.warning += concat("warning: ", msg, "\n");
     }
 
     std::unordered_map<std::string_view, Define> defines;

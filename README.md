@@ -1,6 +1,8 @@
 # cprep
 
-cprep is a preprocesser for C-like language written in C++20.
+cprep is a macro and include preprocessor for C-like language written in C++20.
+
+Some features those are not so well supported by certain toolchains are not used, like `<format>`. But `requires` is used.
 
 ## Basic Usage
 
@@ -12,6 +14,10 @@ public:
     bool require_header(std::string_view header_name, std::string_view file_path, Result &result) override {
         // handle `include`
         // ...
+    }
+
+    void clear() override {
+        // clear read files
     }
 };
 
@@ -42,7 +48,8 @@ Supported features
 * `-D` and `-U` options (both `-Dxxx=xxx` and `-D xxx=xxx` are ok)
 * `__FILE__`, `__LINE__`
 * variable number of parameters, `__VA_ARGS__`, `__VA_OPT__`
-* allow single `'` between numbers in integer or floating-point litteral
+* allow single `'` between numbers in integer or floating-point literal
 * customized include handler
+* unknown directive, pragma and includes are reserved, and a corresponding warning is added
 
-Currently only ASCII input is acceptable. UTF-8 input will be supported in the future.
+Currently only ASCII input is acceptable. Maybe UTF-8 input will be supported in the future.

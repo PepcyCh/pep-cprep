@@ -2,14 +2,22 @@
 
 namespace pep::cprep {
 
+namespace {
+
+char get_char_from_it(std::string_view::const_iterator it) {
+    return *it == '\0' ? EOF : *it;
+}
+
+}
+
 char InputState::look_next_ch() const {
-    return is_end() ? EOF : *p_curr_;
+    return is_end() ? EOF : get_char_from_it(p_curr_);
 }
 
 char InputState::look_next_ch(size_t offset) const {
     offset = std::min<size_t>(offset, p_end_ - p_curr_);
     auto p = p_curr_ + offset;
-    return p == p_end_ ? EOF : *p;
+    return p == p_end_ ? EOF : get_char_from_it(p);
 }
 
 char InputState::get_next_ch() {
