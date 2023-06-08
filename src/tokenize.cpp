@@ -49,8 +49,6 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 } else if ((keep & SpaceKeepType::eNewLine) != SpaceKeepType::eNothing) {
                     output += '\n';
                 }
-            } else {
-                break;
             }
         } else if (first_ch == '\n') {
             in_sl_comment = false;
@@ -200,8 +198,8 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 exp_start = true;
                 has_exp = true;
                 can_be_sep = false;
-            } else if (ch == '-' && !last_exp_start) {
-                return unknown();
+            } else if (ch == '-') {
+                if (!last_exp_start) { return unknown(); }
             } else if ((has_exp || has_dot) && (ch == 'f' || ch == 'F')) {
                 number_end = input.get_p_curr();
             } else if (('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')) {

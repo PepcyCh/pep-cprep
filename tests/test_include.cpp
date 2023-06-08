@@ -35,27 +35,27 @@ int main() {
 R"(
 
 
-#line 1 "/a.hpp"
+#line 1 "a.hpp"
 
 int func_a();
 
-#line 5 "/test.cpp"
+#line 5 "test.cpp"
 
 
-#line 1 "/b.hpp"
+#line 1 "b.hpp"
 
 
 int func_b();
 
 
-#line 8 "/test.cpp"
-#line 1 "/b.hpp"
+#line 8 "test.cpp"
+#line 1 "b.hpp"
 
 
 
 
 
-#line 9 "/test.cpp"
+#line 9 "test.cpp"
 int main() {
     return 0;
 }

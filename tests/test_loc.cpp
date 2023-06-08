@@ -54,12 +54,12 @@ int y = __LINE__;
 )";
     auto expected =
 R"(int x = 1;
-#line 1 "/a.hpp"
+#line 1 "a.hpp"
 
 int a = 2;
-std::string str = "/a.hpp";
+std::string str = "a.hpp";
 
-#line 3 "/test.cpp"
+#line 3 "test.cpp"
 int y = 3;
 )";
     return expect_ok(preprocesser, includer, in_src, expected, nullptr, 0);

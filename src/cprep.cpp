@@ -71,6 +71,40 @@ std::string stringify(std::string_view input) {
     return output;
 }
 
+std::string normalize_path(std::string_view path) {
+    std::vector<std::string_view> parts;
+    size_t last_p = 0;
+    for (auto p = path.find_first_of("/\\"); p != std::string::npos; p = path.find_first_of("/\\", p + 1)) {
+        parts.push_back(path.substr(last_p, p - last_p));
+        last_p = p + 1;
+    }
+    parts.push_back(path.substr(last_p));
+
+    std::vector<size_t> selected_parts;
+    selected_parts.reserve(parts.size());
+    for (size_t i = 0; i < parts.size(); i++) {
+        const auto &s = parts[i];
+        if (s == "..") {
+            if (!selected_parts.empty() && parts[selected_parts.back()] != "..") {
+                selected_parts.pop_back();
+            } else {
+                selected_parts.push_back(i);
+            }
+        } else if (!s.empty() && s != ".") {
+            selected_parts.push_back(i);
+        }
+    }
+
+    std::string normalized_path;
+    for (auto i : selected_parts) {
+        normalized_path += std::string{parts[i]} + '/';
+    }
+    if (!normalized_path.empty()) {
+        normalized_path.pop_back();
+    }
+    return normalized_path;
+}
+
 }
 
 struct Preprocesser::Impl final {
@@ -90,14 +124,14 @@ struct Preprocesser::Impl final {
         try {
             parse_source(result);
         } catch (const PreprocessError &e) {
-            result.error += e.msg + '\n';
+            result.error += "error: " + e.msg + '\n';
         }
         clear_states();
         return result;
     }
 
     void init_states(std::string_view input_path, std::string_view input_content) {
-        auto it = parsed_files.insert(std::string{input_path}).first;
+        auto it = parsed_files.insert(normalize_path(input_path)).first;
         files.push({*it, input_content});
         inputs.emplace(input_content);
         if_stack.push(IfState::eTrue);
@@ -138,7 +172,7 @@ struct Preprocesser::Impl final {
                 auto eq = std::find(opt_b, opt_e, '=');
                 auto name = make_string_view(opt_b, eq);
                 Define def{};
-                if (eq + 1 >= opt_e) {
+                if (eq == opt_e) {
                     def.replace = "";
                 } else {
                     def.replace = make_string_view(eq + 1, opt_e);
@@ -231,8 +265,8 @@ struct Preprocesser::Impl final {
             return;
         }
 
+        bool unknown_directive = true;
         try {
-            bool unknown_directive = true;
 
             // not conditional directives
             // - error, warning
@@ -242,6 +276,7 @@ struct Preprocesser::Impl final {
             // - include
             if (if_stack.top() == IfState::eTrue) {
                 if (token.value == "error" || token.value == "warning") {
+                    unknown_directive = false;
                     std::string message{};
                     while (true) {
                         token = get_next_token(input, message, false);
@@ -261,8 +296,8 @@ struct Preprocesser::Impl final {
                             files.top().path, input.get_lineno(), message
                         ));
                     }
-                    unknown_directive = false;
                 } else if (token.value == "pragma") {
+                    unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
                         throw PreprocessError{std::format(
@@ -278,8 +313,8 @@ struct Preprocesser::Impl final {
                             files.top().path, input.get_lineno(), token.value
                         ));
                     }
-                    unknown_directive = false;
                 } else if (token.value == "line") {
+                    unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eNumber) {
                         throw PreprocessError{std::format(
@@ -313,13 +348,14 @@ struct Preprocesser::Impl final {
                         files.top().path = token.value.substr(1, token.value.size() - 2);
                     }
                     input.set_lineno(line - 1);
-                    unknown_directive = false;
                 } else if (token.value == "include") {
+                    unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     std::string_view header_name{};
                     std::string macro_replaced{};
                     InputState macro_input{macro_replaced};
                     InputState *header_input = &input;
+                    bool del_is_quot = true;
                     if (token.type == TokenType::eIdentifier) {
                         if (auto it = defines.find(token.value); it != defines.end()) {
                             macro_replaced = replace_macro(token.value, it->second);
@@ -336,6 +372,7 @@ struct Preprocesser::Impl final {
                     if (token.type == TokenType::eString) {
                         header_name = token.value.substr(1, token.value.size() - 2);
                     } else if (token.type == TokenType::eLess) {
+                        del_is_quot = false;
                         auto start = header_input->get_p_curr();
                         while (true) {
                             auto ch = header_input->look_next_ch();
@@ -359,6 +396,7 @@ struct Preprocesser::Impl final {
                     }
                     ShaderIncluder::Result include_result{};
                     if (includer->require_header(header_name, files.top().path, include_result)) {
+                        include_result.header_path = normalize_path(include_result.header_path);
                         if (!pragma_once_files.contains(include_result.header_path)) {
                             auto it = parsed_files.insert(std::move(include_result.header_path)).first;
                             files.push({
@@ -369,13 +407,17 @@ struct Preprocesser::Impl final {
                             inputs.emplace(include_result.header_content);
                         }
                     } else {
+                        result.parsed_result += "#include ";
+                        result.parsed_result += del_is_quot ? '"' : '<';
+                        result.parsed_result += header_name;
+                        result.parsed_result += del_is_quot ? '"' : '>';
                         add_warning(result, std::format(
                             "at file '{}' line {}, failed to include header '{}'\n",
                             files.top().path, input.get_lineno(), header_name
                         ));
                     }
-                    unknown_directive = false;
                 } else if (token.value == "define") {
+                    unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
                         throw PreprocessError{std::format(
@@ -395,6 +437,7 @@ struct Preprocesser::Impl final {
                         while (true) {
                             token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                             macro.has_va_params = token.type == TokenType::eTripleDots;
+                            if (token.type == TokenType::eRightBracketRound) { break; }
                             if (token.type != TokenType::eIdentifier && token.type != TokenType::eTripleDots) {
                                 throw PreprocessError{std::format(
                                     "at file '{}' line {}, expected an identifier or '...' when defining macro paramter\n",
@@ -424,9 +467,9 @@ struct Preprocesser::Impl final {
                         if (token.type == TokenType::eEof) { break; }
                     }
                     macro.replace = trim_string_view(input.get_substr_to_curr(start));
-                    unknown_directive = false;
                     defines.insert({macro_name, std::move(macro)});
                 } else if (token.value == "undef") {
+                    unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
                         throw PreprocessError{std::format(
@@ -437,7 +480,6 @@ struct Preprocesser::Impl final {
                     if (auto it = defines.find(token.value); it != defines.end()) {
                         defines.erase(it);
                     }
-                    unknown_directive = false;
                 }
             }
 
@@ -447,7 +489,9 @@ struct Preprocesser::Impl final {
             // - else
             // - endif
             if (token.value == "ifdef" || token.value == "ifndef") {
+                unknown_directive = false;
                 if (if_stack.top() == IfState::eTrue) {
+                    auto is_ifdef = token.value == "ifdef";
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
                         throw PreprocessError{std::format(
@@ -455,13 +499,19 @@ struct Preprocesser::Impl final {
                             files.top().path, input.get_lineno(), token.value
                         )};
                     }
-                    if_stack.push(if_state_from_bool((token.value == "ifdef") == defines.contains(token.value)));
+                    if_stack.push(if_state_from_bool(is_ifdef == defines.contains(token.value)));
                 } else {
-                    if_stack.push(IfState::eFalseWithoutTrueBefore);
+                    if_stack.push(IfState::eFalseWithTrueBefore);
                 }
             } else if (token.value == "if") {
-                if_stack.push(if_state_from_bool(evaluate()));
+                unknown_directive = false;
+                if (if_stack.top() == IfState::eTrue) {
+                    if_stack.push(if_state_from_bool(evaluate()));
+                } else {
+                    if_stack.push(IfState::eFalseWithTrueBefore);
+                }
             } else if (token.value == "else") {
+                unknown_directive = false;
                 if (if_stack.size() == 1) {
                     throw PreprocessError{std::format(
                         "at file '{}' line {}, '#else' without '#if'",
@@ -471,6 +521,7 @@ struct Preprocesser::Impl final {
                 if_stack.top() = if_state_else(if_stack.top());
             } else if (token.value == "elifdef" || token.value == "elifndef") {
                 if (if_stack.size() == 1) {
+                unknown_directive = false;
                     throw PreprocessError{std::format(
                         "at file '{}' line {}, '{}' without '#if'",
                         files.top().path, input.get_lineno(), token.value
@@ -489,6 +540,7 @@ struct Preprocesser::Impl final {
                     if_stack.top() = IfState::eFalseWithTrueBefore;
                 }
             } else if (token.value == "elif") {
+                unknown_directive = false;
                 if (if_stack.size() == 1) {
                     throw PreprocessError{std::format(
                         "at file '{}' line {}, '#elif' without '#if'",
@@ -501,6 +553,7 @@ struct Preprocesser::Impl final {
                     if_stack.top() = IfState::eFalseWithTrueBefore;
                 }
             } else if (token.value == "endif") {
+                unknown_directive = false;
                 if (if_stack.size() == 1) {
                     throw PreprocessError{std::format(
                         "at file '{}' line {}, '#endif' without '#if'",
@@ -509,6 +562,8 @@ struct Preprocesser::Impl final {
                 }
                 if_stack.pop();
             } else if (unknown_directive && if_stack.top() == IfState::eTrue) {
+                result.parsed_result += '#';
+                result.parsed_result += token.value;
                 add_warning(result, std::format(
                     "at file '{}' line {}, unknown directive '{}'",
                     files.top().path, input.get_lineno(), token.value
@@ -519,9 +574,16 @@ struct Preprocesser::Impl final {
         }
 
         // forward to line end
+        const auto keep_value = unknown_directive && if_stack.top() == IfState::eTrue;
         while (true) {
-            token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+            token = get_next_token(
+                input, result.parsed_result, false,
+                keep_value ? SpaceKeepType::eAll : SpaceKeepType::eNewLine
+            );
             if (token.type == TokenType::eEof) { break; }
+            if (keep_value) {
+                result.parsed_result += token.value;
+            }
         }
     }
 
@@ -635,6 +697,9 @@ struct Preprocesser::Impl final {
                         last_begin = token.value.data() + token.value.size();
                     }
                 }
+            }
+            if (macro.params.size() == 0 && args.size() == 1 && args[0].empty()) {
+                args.pop_back();
             }
             if (macro.has_va_params) {
                 if (args.size() < macro.params.size()) {
@@ -756,6 +821,7 @@ struct Preprocesser::Impl final {
                 result_phase1 += concat_str;
                 result_phase1 += spaces;
                 token = next_token;
+                concat_str.clear();
                 spaces.clear();
                 continue;
             }
