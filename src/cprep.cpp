@@ -48,14 +48,6 @@ struct PreprocessError final {
     std::string msg;
 };
 
-struct StringHash final {
-    using is_transparent = void;
-
-    size_t operator()(const std::string &s) const noexcept { return std::hash<std::string_view>{}(s); }
-    size_t operator()(std::string_view s) const noexcept { return std::hash<std::string_view>{}(s); }
-    size_t operator()(const char *s) const noexcept { return std::hash<std::string_view>{}(s); }
-};
-
 std::string_view trim_string_view(std::string_view s) {
     size_t start = 0;
     size_t end = s.size();
@@ -144,7 +136,7 @@ struct Preprocesser::Impl final {
                     std::tie(opt_b, opt_e) = fetch_and_trim_option(i);
                 }
                 auto eq = std::find(opt_b, opt_e, '=');
-                std::string_view name{opt_b, eq};
+                auto name = make_string_view(opt_b, eq);
                 Define def{};
                 if (eq + 1 >= opt_e) {
                     def.replace = "";
@@ -159,8 +151,7 @@ struct Preprocesser::Impl final {
                     if (i == num_options) { continue; }
                     std::tie(opt_b, opt_e) = fetch_and_trim_option(i);
                 }
-                std::string_view name{opt_b, opt_e};
-                undefines.insert(name);
+                undefines.insert(make_string_view(opt_b, opt_e));
             }
         }
 
@@ -832,7 +823,7 @@ struct Preprocesser::Impl final {
     }
 
     std::unordered_map<std::string_view, Define> defines;
-    std::unordered_set<std::string, StringHash, std::equal_to<>> parsed_files;
+    std::unordered_set<std::string> parsed_files;
     std::unordered_set<std::string_view> pragma_once_files;
     std::stack<FileState> files;
     std::stack<InputState> inputs;
