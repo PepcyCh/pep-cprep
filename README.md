@@ -21,11 +21,11 @@ public:
     }
 };
 
-pep::cprep::Preprocesser preprocesser{};
+pep::cprep::Preprocessor Preprocessor{};
 TestIncluder includer{};
 auto in_src_path = "foo.cpp";
 auto in_src_count = read_all_from_file(in_src_path);
-auto result = preprocesser.do_preprocess(in_src_path, in_src_content, includer);
+auto result = Preprocessor.do_preprocess(in_src_path, in_src_content, includer);
 
 result.parsed_result;
 result.error;

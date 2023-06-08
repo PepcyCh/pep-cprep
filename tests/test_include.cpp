@@ -17,7 +17,7 @@ public:
     }
 };
 
-bool test1(pep::cprep::Preprocesser &preprocesser, pep::cprep::ShaderIncluder &includer) {
+bool test1(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &includer) {
     auto in_src =
 R"(#ifndef FOO
 #include "a.hpp"
@@ -61,16 +61,16 @@ int main() {
 }
 )";
     std::string_view options[]{"-DFOO=1"};
-    return expect_ok(preprocesser, includer, in_src, expected, options, 1);
+    return expect_ok(Preprocessor, includer, in_src, expected, options, 1);
 }
 
 int main() {
-    pep::cprep::Preprocesser preprocesser{};
+    pep::cprep::Preprocessor Preprocessor{};
     TestIncluder includer{};
 
     auto pass = true;
 
-    pass &= test1(preprocesser, includer);
+    pass &= test1(Preprocessor, includer);
 
     return pass ? 0 : 1;
 }

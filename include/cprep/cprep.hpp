@@ -28,16 +28,16 @@ public:
 };
 
 
-class Preprocesser final {
+class Preprocessor final {
 public:
-    Preprocesser();
-    ~Preprocesser();
+    Preprocessor();
+    ~Preprocessor();
 
-    Preprocesser(const Preprocesser &rhs) = delete;
-    Preprocesser &operator=(const Preprocesser &rhs) = delete;
+    Preprocessor(const Preprocessor &rhs) = delete;
+    Preprocessor &operator=(const Preprocessor &rhs) = delete;
 
-    Preprocesser(Preprocesser &&rhs);
-    Preprocesser &operator=(Preprocesser &&rhs);
+    Preprocessor(Preprocessor &&rhs);
+    Preprocessor &operator=(Preprocessor &&rhs);
 
     struct Result final {
         std::string parsed_result;

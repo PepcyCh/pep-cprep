@@ -44,7 +44,7 @@ IfState if_state_else(IfState state) {
 
 constexpr size_t kMaxMacroExpandDepth = 512;
 
-struct PreprocessError final {
+struct Preprocessorror final {
     std::string msg;
 };
 
@@ -107,7 +107,7 @@ std::string normalize_path(std::string_view path) {
 
 }
 
-struct Preprocesser::Impl final {
+struct Preprocessor::Impl final {
     Result do_preprocess(
         std::string_view input_path,
         std::string_view input_content,
@@ -123,7 +123,7 @@ struct Preprocesser::Impl final {
         result.parsed_result.reserve(input_content.size());
         try {
             parse_source(result);
-        } catch (const PreprocessError &e) {
+        } catch (const Preprocessorror &e) {
             result.error += "error: " + e.msg + '\n';
         }
         clear_states();
@@ -249,7 +249,7 @@ struct Preprocesser::Impl final {
         }
 
         if (if_stack.size() > 1) {
-            throw PreprocessError{"unterminated conditional directive"};
+            throw Preprocessorror{"unterminated conditional directive"};
         }
     }
 
@@ -258,7 +258,7 @@ struct Preprocesser::Impl final {
         auto token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
         if (token.type != TokenType::eIdentifier) {
             if (token.type != TokenType::eEof) {
-                throw PreprocessError{concat(
+                throw Preprocessorror{concat(
                     "at file '", files.top().path, "' line ", input.get_lineno(),
                     ", expected an identifier after '#'"
                 )};
@@ -301,7 +301,7 @@ struct Preprocesser::Impl final {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", expected an identifier after 'pragma'\n"
                         )};
@@ -320,7 +320,7 @@ struct Preprocesser::Impl final {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eNumber) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", #line directive requires a positive integer argument\n"
                         )};
@@ -329,13 +329,13 @@ struct Preprocesser::Impl final {
                     try {
                         line = str_to_number(token.value);
                     } catch (const EvaluateError &e) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", #line directive requires a positive integer argument\n"
                         )};
                     }
                     if (line <= 0) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", #line directive requires a positive integer argument\n"
                         )};
@@ -343,7 +343,7 @@ struct Preprocesser::Impl final {
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eEof) {
                         if (token.type != TokenType::eString) {
-                            throw PreprocessError{concat(
+                            throw Preprocessorror{concat(
                                 "at file '", files.top().path, "' line ", input.get_lineno(),
                                 ", Invalid filename for #line directive\n"
                             )};
@@ -365,7 +365,7 @@ struct Preprocesser::Impl final {
                             macro_input = InputState{macro_replaced};
                             header_input = &macro_input;
                         } else {
-                            throw PreprocessError{concat(
+                            throw Preprocessorror{concat(
                                 "at file '", files.top().path, "' line ", input.get_lineno(),
                                 ", expected a header file name\n"
                             )};
@@ -384,7 +384,7 @@ struct Preprocesser::Impl final {
                                 header_input->skip_next_ch();
                                 break;
                             } else if (ch == EOF || ch == '\n') {
-                                throw PreprocessError{concat(
+                                throw Preprocessorror{concat(
                                     "at file '", files.top().path, "' line ", input.get_lineno(),
                                     ", expected a header file name\n"
                                 )};
@@ -392,7 +392,7 @@ struct Preprocesser::Impl final {
                             header_input->skip_next_ch();
                         }
                     } else {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", expected a header file name\n"
                         )};
@@ -423,7 +423,7 @@ struct Preprocesser::Impl final {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", expected an identifier after 'define'\n"
                         )};
@@ -442,7 +442,7 @@ struct Preprocesser::Impl final {
                             macro.has_va_params = token.type == TokenType::eTripleDots;
                             if (token.type == TokenType::eRightBracketRound) { break; }
                             if (token.type != TokenType::eIdentifier && token.type != TokenType::eTripleDots) {
-                                throw PreprocessError{concat(
+                                throw Preprocessorror{concat(
                                     "at file '", files.top().path, "' line ", input.get_lineno(),
                                     ", expected an identifier or '...' when defining macro paramter\n"
                                 )};
@@ -451,13 +451,13 @@ struct Preprocesser::Impl final {
                             token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                             if (token.type == TokenType::eRightBracketRound) { break; }
                             if (token.type != TokenType::eComma) {
-                                throw PreprocessError{concat(
+                                throw Preprocessorror{concat(
                                     "at file '", files.top().path, "' line ", input.get_lineno(),
                                     ", expected ',' or ')' after a macro paramter\n"
                                 )};
                             }
                             if (macro.has_va_params) {
-                                throw PreprocessError{concat(
+                                throw Preprocessorror{concat(
                                     "at file '", files.top().path, "' line ", input.get_lineno(),
                                     ", '...' must be the last macro paramter\n"
                                 )};
@@ -475,7 +475,7 @@ struct Preprocesser::Impl final {
                     unknown_directive = false;
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", expected an identifier after 'undef'\n"
                         )};
@@ -497,7 +497,7 @@ struct Preprocesser::Impl final {
                     auto is_ifdef = token.value == "ifdef";
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", expected an identifier after '", token.value, "'\n"
                         )};
@@ -516,7 +516,7 @@ struct Preprocesser::Impl final {
             } else if (token.value == "else") {
                 unknown_directive = false;
                 if (if_stack.size() == 1) {
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", files.top().path, "' line ", input.get_lineno(),
                         ", '#else' without '#if'"
                     )};
@@ -525,7 +525,7 @@ struct Preprocesser::Impl final {
             } else if (token.value == "elifdef" || token.value == "elifndef") {
                 if (if_stack.size() == 1) {
                 unknown_directive = false;
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", files.top().path, "' line ", input.get_lineno(),
                         ", '", token.value, "' without '#if'"
                     )};
@@ -533,7 +533,7 @@ struct Preprocesser::Impl final {
                 if (if_stack.top() == IfState::eFalseWithoutTrueBefore) {
                     token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
                     if (token.type != TokenType::eIdentifier) {
-                        throw PreprocessError{concat(
+                        throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
                             ", expected an identifier after '", token.value, "'\n"
                         )};
@@ -545,7 +545,7 @@ struct Preprocesser::Impl final {
             } else if (token.value == "elif") {
                 unknown_directive = false;
                 if (if_stack.size() == 1) {
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", files.top().path, "' line ", input.get_lineno(),
                         ", '#elif' without '#if'"
                     )};
@@ -558,7 +558,7 @@ struct Preprocesser::Impl final {
             } else if (token.value == "endif") {
                 unknown_directive = false;
                 if (if_stack.size() == 1) {
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", files.top().path, "' line ", input.get_lineno(),
                         ", '#endif' without '#if'"
                     )};
@@ -572,7 +572,7 @@ struct Preprocesser::Impl final {
                     ", unknown directive '", token.value, "'"
                 ));
             }
-        } catch (const PreprocessError &e) {
+        } catch (const Preprocessorror &e) {
             add_error(result, e.msg);
         }
 
@@ -599,7 +599,7 @@ struct Preprocesser::Impl final {
             auto token = get_next_token(inputs.top(), replaced, false);
             if (token.type == TokenType::eEof) { break; }
             if (token.type == TokenType::eUnknown) {
-                throw PreprocessError{concat(err_loc, ", failed to parse a valid token")};
+                throw Preprocessorror{concat(err_loc, ", failed to parse a valid token")};
             }
             if (token.type == TokenType::eIdentifier) {
                 if (auto it = defines.find(token.value); it != defines.end()) {
@@ -611,18 +611,18 @@ struct Preprocesser::Impl final {
                         value = defines.contains(token.value);
                     } else {
                         if (token.type != TokenType::eLeftBracketRound) {
-                            throw PreprocessError{concat(
+                            throw Preprocessorror{concat(
                                 err_loc, ", expected a '(' or an identifier after 'defined'"
                             )};
                         }
                         token = get_next_token(inputs.top(), replaced, false);
                         if (token.type != TokenType::eIdentifier) {
-                            throw PreprocessError{concat(err_loc, ", expected an identifier inside 'defined'")};
+                            throw Preprocessorror{concat(err_loc, ", expected an identifier inside 'defined'")};
                         }
                         value = defines.contains(token.value);
                         token = get_next_token(inputs.top(), replaced, false);
                         if (token.type != TokenType::eRightBracketRound) {
-                            throw PreprocessError{concat(err_loc, ", expected a ')' after 'defined'")};
+                            throw Preprocessorror{concat(err_loc, ", expected a ')' after 'defined'")};
                         }
                     }
                     replaced += value ? "1" : "0";
@@ -642,7 +642,7 @@ struct Preprocesser::Impl final {
             InputState input{replaced};
             return evaluate_expression(input);
         } catch (const EvaluateError &e) {
-            throw PreprocessError{concat(err_loc, ", ", e.msg)};
+            throw Preprocessorror{concat(err_loc, ", ", e.msg)};
         }
     }
 
@@ -673,14 +673,14 @@ struct Preprocesser::Impl final {
             while (true) {
                 token = get_next_token(inputs.top(), fallback);
                 if (token.type == TokenType::eEof) {
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", curr_file, "' line ", curr_line,
                         ", when replacing function-like macro '", macro_name, "', "
                         "find end of input before finding corresponding ')'"
                     )};
                 }
                 if (token.type == TokenType::eUnknown) {
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", curr_file, "' line ", curr_line,
                         ", when replacing function-like macro '", macro_name, "', failed to parse a valid token"
                     )};
@@ -706,7 +706,7 @@ struct Preprocesser::Impl final {
             }
             if (macro.has_va_params) {
                 if (args.size() < macro.params.size()) {
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", curr_file, "' line ", curr_line,
                         ", when replacing function-like macro '", macro_name, "', "
                         "the macro needs at least ", macro.params.size(), " arguments but ", args.size(), " are given"
@@ -714,7 +714,7 @@ struct Preprocesser::Impl final {
                 }
             } else {
                 if (args.size() != macro.params.size()) {
-                    throw PreprocessError{concat(
+                    throw Preprocessorror{concat(
                         "at file '", curr_file, "' line ", curr_line,
                         ", when replacing function-like macro '", macro_name, "', "
                         "the macro needs ", macro.params.size(), " arguments but ", args.size(), " are given"
@@ -725,7 +725,7 @@ struct Preprocesser::Impl final {
 
         auto err_loc = concat(
             "at file '", curr_file, "' line ", curr_line,
-            ", when replacing macro ", (is_param ? "parameter" : ""), "'", macro_name,
+            ", when replacing macro ", std::string_view{is_param ? "parameter" : ""}, "'", macro_name,
             "' (defined at file '", macro.file, "' line ", macro.lineno, ")"
         );
         inputs.emplace(macro.replace);
@@ -773,19 +773,19 @@ struct Preprocesser::Impl final {
                 break;
             } else if (token.type == TokenType::eUnknown) {
                 inputs.pop();
-                throw PreprocessError{concat(err_loc, ", failed to parse a valid token")};
+                throw Preprocessorror{concat(err_loc, ", failed to parse a valid token")};
             }
             // stringify, only when macro is function-like
             if (macro.function_like) {
                 if (token.type == TokenType::eSharp) {
                     if (next_token.type != TokenType::eIdentifier) {
                         inputs.pop();
-                        throw PreprocessError{concat(err_loc, ", expected a macro parameter after '#'")};
+                        throw Preprocessorror{concat(err_loc, ", expected a macro parameter after '#'")};
                     }
                     if (next_token.value == "__VA_ARGS__") {
                         if (!macro.has_va_params) {
                             inputs.pop();
-                            throw PreprocessError{concat(
+                            throw Preprocessorror{concat(
                                 err_loc,
                                 ", '__VA_ARGS__' is used after '#' but macro doesn't have variable number of paramters"
                             )};
@@ -799,7 +799,7 @@ struct Preprocesser::Impl final {
                         auto it = std::find(macro.params.begin(), macro.params.end(), next_token.value);
                         if (it == macro.params.end()) {
                             inputs.pop();
-                            throw PreprocessError{concat(
+                            throw Preprocessorror{concat(
                                 err_loc, ", expected a macro parameter after '#'"
                             )};
                         }
@@ -902,27 +902,27 @@ struct Preprocesser::Impl final {
     size_t curr_line; // used in replace_macro
 };
 
-Preprocesser::Preprocesser() {
+Preprocessor::Preprocessor() {
     impl_ = new Impl{};
 }
 
-Preprocesser::~Preprocesser() {
+Preprocessor::~Preprocessor() {
     if (impl_) { delete impl_; }
 }
 
-Preprocesser::Preprocesser(Preprocesser &&rhs) {
+Preprocessor::Preprocessor(Preprocessor &&rhs) {
     impl_ = rhs.impl_;
     rhs.impl_ = nullptr;
 }
 
-Preprocesser &Preprocesser::operator=(Preprocesser &&rhs) {
+Preprocessor &Preprocessor::operator=(Preprocessor &&rhs) {
     if (impl_) { delete impl_; }
     impl_ = rhs.impl_;
     rhs.impl_ = nullptr;
     return *this;
 }
 
-Preprocesser::Result Preprocesser::do_preprocess(
+Preprocessor::Result Preprocessor::do_preprocess(
     std::string_view input_path,
     std::string_view input_content,
     ShaderIncluder &includer,

@@ -25,7 +25,8 @@ constexpr std::string_view make_string_view(It first, End last) {
 }
 
 
-inline size_t string_length_of(const char *s) { return std::strlen(s); }
+template <size_t Size>
+size_t string_length_of(const char (&s)[Size]) { return Size; }
 inline size_t string_length_of(std::string_view s) { return s.size(); }
 inline size_t string_length_of(const std::string &s) { return s.size(); }
 inline size_t string_length_of(std::string &&s) { return s.size(); }
@@ -37,7 +38,8 @@ std::string concat_string(StringLike &&... args) {
     ((s += std::forward<StringLike>(args)), ...);
     return s;
 }
-inline const char *to_string_like(const char *s) { return s; }
+template <size_t Size>
+auto to_string_like(const char (&s)[Size]) -> const char (&)[Size] { return s; }
 inline std::string_view to_string_like(std::string_view s) { return s; }
 inline const std::string &to_string_like(const std::string &s) { return s; }
 inline std::string &&to_string_like(std::string &&s) { return std::move(s); }

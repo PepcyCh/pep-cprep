@@ -17,14 +17,14 @@ inline std::string show_space(std::string_view in) {
 }
 
 inline bool expect_ok(
-    pep::cprep::Preprocesser &preprocesser,
+    pep::cprep::Preprocessor &Preprocessor,
     pep::cprep::ShaderIncluder &includer,
     std::string_view in_src,
     std::string_view expected,
     std::string_view *options,
     size_t num_options
 ) {
-    auto result = preprocesser.do_preprocess("/test.cpp", in_src, includer, options, num_options);
+    auto result = Preprocessor.do_preprocess("/test.cpp", in_src, includer, options, num_options);
     auto pass = result.parsed_result == expected && result.error.empty() && result.warning.empty();
     if (!pass) {
         std::cout << "expected ('@' marks the end of line):\n" << show_space(expected)
