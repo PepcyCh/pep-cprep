@@ -2,7 +2,7 @@
 
 class TestIncluder final : public pep::cprep::ShaderIncluder {
 public:
-    bool require_header(std::string_view header_name, std::string_view file_path, Result &result) const {
+    bool require_header(std::string_view header_name, std::string_view file_path, Result &result) override {
         if (header_name == "a.hpp") {
             result.header_path = "/a.hpp";
             result.header_content = "#pragma once\nint a = __LINE__;\nstd::string str = __FILE__;\n";

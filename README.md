@@ -9,7 +9,7 @@ cprep is a preprocesser for C-like language written in C++20.
 
 class Includer final : public pep::cprep::ShaderIncluder {
 public:
-    bool require_header(std::string_view header_name, std::string_view file_path, Result &result) const {
+    bool require_header(std::string_view header_name, std::string_view file_path, Result &result) override {
         // handle `include`
         // ...
     }

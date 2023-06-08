@@ -14,7 +14,7 @@ public:
 
     virtual ~ShaderIncluder() = default;
 
-    virtual bool require_header(std::string_view header_name, std::string_view file_path, Result &result) const = 0;
+    virtual bool require_header(std::string_view header_name, std::string_view file_path, Result &result) = 0;
 
     // derived class can release owned header contents in 'clear()'
     virtual void clear() {}
@@ -22,7 +22,7 @@ public:
 
 class EmptyInclude final : public pep::cprep::ShaderIncluder {
 public:
-    bool require_header(std::string_view header_name, std::string_view file_path, Result &result) const {
+    bool require_header(std::string_view header_name, std::string_view file_path, Result &result) override {
         return false;
     }
 };
