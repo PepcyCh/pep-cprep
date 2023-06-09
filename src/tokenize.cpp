@@ -1,6 +1,7 @@
 #include "tokenize.hpp"
 
 #include <cctype>
+#include <cstring>
 #include <string>
 
 namespace pep::cprep {
@@ -18,7 +19,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
     auto first_ch = input.get_next_ch();
     bool in_ml_comment = false;
     bool in_sl_comment = false;
-    while (first_ch != EOF) {
+    while (!is_eof(first_ch)) {
         if (first_ch == '/' && !in_ml_comment && !in_sl_comment) {
             auto second_ch = input.look_next_ch();
             if (second_ch == '*') {
@@ -71,14 +72,14 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         first_ch = input.get_next_ch();
     }
 
-    if (first_ch == EOF) { return {TokenType::eEof, {}}; }
+    if (is_eof(first_ch)) { return {TokenType::eEof, {}}; }
 
     // scan token
     const auto p_start = input.get_p_curr() - 1;
     auto unknown = [&input, p_start]() {
         while (true) {
             auto ch = input.look_next_ch();
-            if (std::isspace(ch) || ch == EOF) { break; }
+            if (std::isspace(ch) || is_eof(ch)) { break; }
             input.skip_next_ch();
         }
         return Token{TokenType::eUnknown, input.get_substr_to_curr(p_start)};
@@ -95,7 +96,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 escape = true;
             } else if (ch == first_ch) {
                 break;
-            } else if (ch == EOF) {
+            } else if (is_eof(ch)) {
                 return unknown();
             }
         }
@@ -120,7 +121,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         // number 0
         if (std::isblank(second_ch)) { return {TokenType::eNumber, input.get_substr_to_curr(p_start)}; }
         // single dot
-        if (first_ch == '.' && (second_ch == EOF || is_identifier_head(second_ch))) {
+        if (first_ch == '.' && (is_eof(second_ch) || is_identifier_head(second_ch))) {
             return {TokenType::eDot, input.get_substr_to_curr(p_start)};
         }
         // triple dots ...

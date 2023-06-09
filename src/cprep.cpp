@@ -3,6 +3,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <stack>
+#include <vector>
+#include <algorithm>
 
 #include "tokenize.hpp"
 #include "evaluate.hpp"
@@ -72,6 +74,7 @@ std::string stringify(std::string_view input) {
 }
 
 std::string normalize_path(std::string_view path) {
+    const auto is_absolute = !path.empty() && path[0] == '/';
     std::vector<std::string_view> parts;
     size_t last_p = 0;
     for (auto p = path.find_first_of("/\\"); p != std::string::npos; p = path.find_first_of("/\\", p + 1)) {
@@ -96,6 +99,9 @@ std::string normalize_path(std::string_view path) {
     }
 
     std::string normalized_path;
+    if (is_absolute && (selected_parts.empty() || parts[selected_parts[0]] != "..")) {
+        normalized_path += '/';
+    }
     for (auto i : selected_parts) {
         normalized_path += std::string{parts[i]} + '/';
     }
@@ -383,7 +389,7 @@ struct Preprocessor::Impl final {
                                 header_name = make_string_view(start, header_input->get_p_curr());
                                 header_input->skip_next_ch();
                                 break;
-                            } else if (ch == EOF || ch == '\n') {
+                            } else if (is_eof(ch) || ch == '\n') {
                                 throw Preprocessorror{concat(
                                     "at file '", files.top().path, "' line ", input.get_lineno(),
                                     ", expected a header file name\n"
@@ -689,14 +695,14 @@ struct Preprocessor::Impl final {
                     ++num_brackets;
                 } else if (token.type == TokenType::eRightBracketRound) {
                     if (num_brackets == 0) {
-                        args.push_back(trim_string_view({last_begin, token.value.data()}));
+                        args.push_back(trim_string_view(make_string_view(last_begin, token.value.data())));
                         break;
                     } else {
                         --num_brackets;
                     }
                 } else if (token.type == TokenType::eComma) {
                     if (num_brackets == 0) {
-                        args.push_back(trim_string_view({last_begin, token.value.data()}));
+                        args.push_back(trim_string_view(make_string_view(last_begin, token.value.data())));
                         last_begin = token.value.data() + token.value.size();
                     }
                 }

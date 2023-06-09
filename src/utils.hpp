@@ -5,6 +5,11 @@
 
 namespace pep::cprep {
 
+
+// some compiler says that comparation of char and -1 is always true so cast to int
+constexpr bool is_eof(char ch) { return static_cast<int>(ch) == EOF; }
+
+
 // for compiler that doesn't support std::string_view{first, last} ctor
 template<class T>
 constexpr T *cprep_to_address(T *p) noexcept {
