@@ -83,6 +83,25 @@ a, 123;
     return expect_ok(Preprocessor, includer, in_src, expected, options, 2);
 }
 
+bool test6(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &includer) {
+    auto in_src =
+R"(#define ARRAY(a, b, c) {(a), (b), (c)}
+#define TYPE unsigned int
+TYPE test[]ARRAY(
+    1, 2, 3
+);
+)";
+    auto expected =
+R"(
+
+unsigned int test[]{(1), (2), (3)}
+
+;
+)";
+    std::string_view options[]{"-D", "FOO=123"};
+    return expect_ok(Preprocessor, includer, in_src, expected, options, 2);
+}
+
 int main() {
     pep::cprep::Preprocessor Preprocessor{};
     pep::cprep::EmptyInclude includer{};
@@ -94,6 +113,7 @@ int main() {
     pass &= test3(Preprocessor, includer);
     pass &= test4(Preprocessor, includer);
     pass &= test5(Preprocessor, includer);
+    pass &= test6(Preprocessor, includer);
 
     return pass ? 0 : 1;
 }

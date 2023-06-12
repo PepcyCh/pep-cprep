@@ -2,7 +2,7 @@
 
 cprep is a macro and include preprocessor for C-like language written in C++20.
 
-Some features those are not so well supported by certain toolchains are not used, like `<format>`. But `requires` is used.
+Some features those are not so well supported by certain toolchains (like NDK, emsdk) are not used, like `<format>`. But `requires` is used.
 
 ## Basic Usage
 

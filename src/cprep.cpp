@@ -53,8 +53,8 @@ struct Preprocessorror final {
 std::string_view trim_string_view(std::string_view s) {
     size_t start = 0;
     size_t end = s.size();
-    while (start < end && std::isblank(s[start])) { ++start; }
-    while (start < end && std::isblank(s[end - 1])) { --end; }
+    while (start < end && std::isspace(s[start])) { ++start; }
+    while (start < end && std::isspace(s[end - 1])) { --end; }
     return s.substr(start, end - start);
 }
 
@@ -666,6 +666,7 @@ struct Preprocessor::Impl final {
 
         // parse arguments for function-like macro
         std::vector<std::string_view> args;
+        std::string trailing_newlines{};
         if (macro.function_like) {
             std::string fallback{macro_name};
             args.reserve(macro.params.size());
@@ -726,6 +727,10 @@ struct Preprocessor::Impl final {
                         "the macro needs ", macro.params.size(), " arguments but ", args.size(), " are given"
                     )};
                 }
+            }
+            // keep line number of input
+            for (size_t i = macro_name.size(); i < fallback.size(); i++) {
+                if (fallback[i] == '\n') { trailing_newlines += '\n'; }
             }
         }
 
@@ -887,7 +892,7 @@ struct Preprocessor::Impl final {
             }
         }
 
-        return result;
+        return result + trailing_newlines;
     }
 
     void add_error(Result &result, std::string_view msg) {
