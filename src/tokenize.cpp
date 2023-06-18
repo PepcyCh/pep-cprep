@@ -1,15 +1,26 @@
 #include "tokenize.hpp"
 
-#include <cctype>
 #include <cstring>
 #include <string>
 
-namespace pep::cprep {
+#include "unicode_ident.hpp"
+
+PEP_CPREP_NAMESPACE_BEGIN
 
 namespace {
 
-bool is_identifier_head(char ch) {
-    return std::isalpha(ch) || ch == '_' || ch == '$';
+// functions from cctype may abory when input is not in [-1, 255]
+
+bool is_blank(int ch) {
+    return ch == ' ' || ch == '\t';
+}
+
+bool is_space(int ch) {
+    return is_blank(ch) || ch == '\n' || ch == '\r' || ch == '\f' || ch == '\v';
+}
+
+bool is_digit(int ch) {
+    return '0' <= ch && ch <= '9';
 }
 
 }
@@ -61,10 +72,10 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                     input.set_line_start(true);
                 }
             } else {
-                input.unget_chars(1);
+                input.unget_last_ch();
                 return {TokenType::eEof, {}};
             }
-        } else if (!std::isspace(first_ch) && !in_ml_comment && !in_sl_comment) {
+        } else if (!is_space(first_ch) && !in_ml_comment && !in_sl_comment) {
             break;
         } else {
             if ((keep & SpaceKeepType::eSpace) != SpaceKeepType::eNothing) { output += ' '; }
@@ -73,13 +84,16 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
     }
 
     if (is_eof(first_ch)) { return {TokenType::eEof, {}}; }
+    if (first_ch == kCharInvaliad) { return {TokenType::eUnknown, {}}; }
 
     // scan token
-    const auto p_start = input.get_p_curr() - 1;
+    input.unget_last_ch();
+    const auto p_start = input.get_p_curr();
+    input.skip_next_ch();
     auto unknown = [&input, p_start]() {
         while (true) {
             auto ch = input.look_next_ch();
-            if (std::isspace(ch) || is_eof(ch)) { break; }
+            if (is_space(ch) || is_eof(ch)) { break; }
             input.skip_next_ch();
         }
         return Token{TokenType::eUnknown, input.get_substr_to_curr(p_start)};
@@ -109,19 +123,19 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         } else {
             return {TokenType::eSharp, input.get_substr_to_curr(p_start)};
         }
-    } else if (is_identifier_head(first_ch)) {
+    } else if (is_xid_start(first_ch)) {
         while (true) {
             auto ch = input.look_next_ch();
-            if (!is_identifier_head(ch) && !std::isdigit(ch)) { break; }
+            if (!is_xid_continue(ch)) { break; }
             input.skip_next_ch();
         }
         return {TokenType::eIdentifier, input.get_substr_to_curr(p_start)};
-    } else if (std::isdigit(first_ch) || first_ch == '.') {
+    } else if (is_digit(first_ch) || first_ch == '.') {
         auto second_ch = input.look_next_ch();
         // number 0
-        if (std::isblank(second_ch)) { return {TokenType::eNumber, input.get_substr_to_curr(p_start)}; }
+        if (is_blank(second_ch)) { return {TokenType::eNumber, input.get_substr_to_curr(p_start)}; }
         // single dot
-        if (first_ch == '.' && (is_eof(second_ch) || is_identifier_head(second_ch))) {
+        if (first_ch == '.' && (is_eof(second_ch) || is_xid_start(second_ch))) {
             return {TokenType::eDot, input.get_substr_to_curr(p_start)};
         }
         // triple dots ...
@@ -146,7 +160,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             if (second_ch == '\'') {
                 input.skip_next_ch();
                 second_ch = input.get_next_ch();
-                if (!std::isdigit(second_ch)) { return unknown(); }
+                if (!is_digit(second_ch)) { return unknown(); }
             }
             if (second_ch == 'x' || second_ch == 'X') {
                 input.skip_next_ch();
@@ -161,7 +175,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 last_exp_start = true;
                 has_exp = true;
                 can_be_sep = false;
-            } else if (std::isdigit(second_ch)) {
+            } else if (is_digit(second_ch)) {
                 input.skip_next_ch();
                 base = 8;
             } else if (second_ch == '.') {
@@ -207,7 +221,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
             } else if (('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')) {
                 if (base != 16 || has_exp) { return unknown(); }
                 can_be_sep = true;
-            } else if (std::isdigit(ch)) {
+            } else if (is_digit(ch)) {
                 can_be_sep = true;
             } else {
                 number_end = input.get_p_curr();
@@ -412,4 +426,4 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
     return unknown();
 }
 
-}
+PEP_CPREP_NAMESPACE_END

@@ -2,7 +2,9 @@
 
 #include <string>
 
-namespace pep::cprep {
+#include "config.hpp"
+
+PEP_CPREP_NAMESPACE_BEGIN
 
 class ShaderIncluder {
 public:
@@ -58,4 +60,4 @@ private:
     Impl *impl_ = nullptr;
 };
 
-}
+PEP_CPREP_NAMESPACE_END

@@ -21,6 +21,7 @@ assert(1);
 #define STRINGIFY_MACRO(x) STRINGIFY(x)
 STRINGIFY(FOO);
 STRINGIFY_MACRO(FOO);
+std::string ŝtrīňg = "你好";
 )";
     auto expected =
 R"(
@@ -42,6 +43,7 @@ do {         if (!(1)) {             abort();         }     } while (0);
 
 "FOO";
 "abc";
+std::string ŝtrīňg = "你好";
 )";
     return expect_ok(Preprocessor, includer, in_src, expected, nullptr, 0);
 }

@@ -51,5 +51,14 @@ Supported features
 * allow single `'` between numbers in integer or floating-point literal
 * customized include handler
 * unknown directive, pragma and includes are reserved, and a corresponding warning is added
+* UTF-8 input and unicode identifier (but only UTF-8 input is acceptable currently)
 
-Currently only ASCII input is acceptable. Maybe UTF-8 input will be supported in the future.
+## Integration
+
+One can just add the source files to the project or use `add_subdirectory(pep-cprep)` add link to target `pep-cprep` when using CMake.
+
+One can define `PEP_CPREP_INLINE_NAMESPACE` in `cprep/config.hpp`, or set variable `CPREP_INLINE_NAMESPACE` before `add_subdirectory()` in CMake, or add `target_compile_definitions()` to target `pep-cperp` to define an inline namespace name. By default, the namespace is `pep::cprep::inline <version>`, if `PEP_CPREP_INLINE_NAMESPACE` is set to `foo` for example, the namespace becomes `pep::cprep::inline foo`. This is useful when cprep is expected to be bundled inside a static library to avoid symbol conflicting.
+
+## Acknowledgement
+
+The source `unicode_ident.cpp` is modified from [Unicode ident](https://github.com/dtolnay/unicode-ident) by dtolnay.

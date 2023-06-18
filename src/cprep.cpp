@@ -10,7 +10,7 @@
 #include "evaluate.hpp"
 #include "utils.hpp"
 
-namespace pep::cprep {
+PEP_CPREP_NAMESPACE_BEGIN
 
 namespace {
 
@@ -943,4 +943,4 @@ Preprocessor::Result Preprocessor::do_preprocess(
     return impl_->do_preprocess(input_path, input_content, includer, options, num_options);
 }
 
-}
+PEP_CPREP_NAMESPACE_END

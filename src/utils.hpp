@@ -3,11 +3,14 @@
 #include <string>
 #include <string_view>
 
-namespace pep::cprep {
+#include <cprep/config.hpp>
 
+PEP_CPREP_NAMESPACE_BEGIN
 
-// some compiler says that comparation of char and -1 is always true so cast to int
-constexpr bool is_eof(char ch) { return static_cast<int>(ch) == EOF; }
+inline constexpr int kCharEof = -1;
+inline constexpr int kCharInvaliad = -2;
+
+constexpr bool is_eof(int ch) { return ch == kCharEof; }
 
 
 // for compiler that doesn't support std::string_view{first, last} ctor
@@ -72,14 +75,14 @@ public:
     void set_lineno(size_t lineno) { lineno_ = lineno; }
     void set_line_start(bool line_start) { line_start_ = line_start; }
 
-    char look_next_ch() const;
-    char look_next_ch(size_t offset) const;
-    char get_next_ch();
+    int look_next_ch() const;
+    int look_next_ch(size_t offset) const;
+    int get_next_ch();
+    void unget_last_ch();
+
     void skip_next_ch();
     void skip_to_end();
-
     void skip_chars(size_t count);
-    void unget_chars(size_t count);
 
     std::string_view get_substr(std::string_view::const_iterator p_start, std::string_view::const_iterator p_end) const;
     std::string_view get_substr(std::string_view::const_iterator p_start, size_t count) const;
@@ -94,4 +97,4 @@ private:
     bool line_start_ = true;
 };
 
-}
+PEP_CPREP_NAMESPACE_END

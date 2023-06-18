@@ -2,7 +2,7 @@
 
 #include "utils.hpp"
 
-namespace pep::cprep {
+PEP_CPREP_NAMESPACE_BEGIN
 
 enum class TokenType {
     eEof,
@@ -86,4 +86,4 @@ Token get_next_token(
     InputState &input, std::string &output, bool space_cross_line = true, SpaceKeepType keep = SpaceKeepType::eAll
 );
 
-}
+PEP_CPREP_NAMESPACE_END

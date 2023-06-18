@@ -8,7 +8,7 @@
 
 #include "tokenize.hpp"
 
-namespace pep::cprep {
+PEP_CPREP_NAMESPACE_BEGIN
 
 namespace {
 
@@ -296,4 +296,4 @@ bool evaluate_expression(InputState &input) {
     return values[0];
 }
 
-}
+PEP_CPREP_NAMESPACE_END

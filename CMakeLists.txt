@@ -20,6 +20,10 @@ add_library(pep-cprep ${CPREP_PUBLIC_SOURCES} ${CPREP_PRIVATE_SOURCES})
 target_compile_features(pep-cprep PUBLIC cxx_std_20)
 target_include_directories(pep-cprep PUBLIC include)
 
+if(CPREP_INLINE_NAMESPACE AND NOT CPREP_INLINE_NAMESPACE STREQUAL "")
+    target_compile_definitions(pep-cprep PUBLIC PEP_CPREP_INLINE_NAMESPACE=${CPREP_INLINE_NAMESPACE})
+endif()
+
 
 if(CPREP_BUILD_TESTS)
     enable_testing()
