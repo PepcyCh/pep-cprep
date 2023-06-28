@@ -11,12 +11,17 @@ else()
     set(CPREP_MASTER_PROJECT OFF)
 endif()
 
+option(CPREP_BUILD_OBJECT_LIB "build pep-cprep as object library" OFF)
 cmake_dependent_option(CPREP_BUILD_TESTS "build tests of pep-cprep" ON "CPREP_MASTER_PROJECT" OFF)
 
 
 file(GLOB_RECURSE CPREP_PUBLIC_SOURCES include/*.hpp)
 file(GLOB_RECURSE CPREP_PRIVATE_SOURCES src/*.cpp src/*.hpp)
-add_library(pep-cprep ${CPREP_PUBLIC_SOURCES} ${CPREP_PRIVATE_SOURCES})
+if(NOT CPREP_BUILD_OBJECT_LIB)
+    add_library(pep-cprep ${CPREP_PUBLIC_SOURCES} ${CPREP_PRIVATE_SOURCES})
+else()
+    add_library(pep-cprep OBJECT ${CPREP_PUBLIC_SOURCES} ${CPREP_PRIVATE_SOURCES})
+endif()
 target_compile_features(pep-cprep PUBLIC cxx_std_20)
 target_include_directories(pep-cprep PUBLIC include)
 

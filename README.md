@@ -57,6 +57,8 @@ Supported features
 
 One can just add the source files to the project or use `add_subdirectory(pep-cprep)` add link to target `pep-cprep` when using CMake.
 
+One can set `CPREP_BUILD_OBJECT_LIB` to ON to make `pep-cprep` an object target, which can be integrated into some static library.
+
 One can define `PEP_CPREP_INLINE_NAMESPACE` in `cprep/config.hpp`, or set variable `CPREP_INLINE_NAMESPACE` before `add_subdirectory()` in CMake, or add `target_compile_definitions()` to target `pep-cperp` to define an inline namespace name. By default, the namespace is `pep::cprep::inline <version>`, if `PEP_CPREP_INLINE_NAMESPACE` is set to `foo` for example, the namespace becomes `pep::cprep::inline foo`. This is useful when cprep is expected to be bundled inside a static library to avoid symbol conflicting.
 
 ## Acknowledgement

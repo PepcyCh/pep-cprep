@@ -5,6 +5,7 @@
 //  '_' is added to ASCII_START
 
 #include <cstdint>
+#include <cstddef>
 
 #include "unicode_ident.hpp"
 
