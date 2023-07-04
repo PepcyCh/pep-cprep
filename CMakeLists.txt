@@ -13,6 +13,7 @@ endif()
 
 option(CPREP_BUILD_OBJECT_LIB "build pep-cprep as object library" OFF)
 cmake_dependent_option(CPREP_BUILD_TESTS "build tests of pep-cprep" ON "CPREP_MASTER_PROJECT" OFF)
+cmake_dependent_option(CPREP_BUILD_BIN "build binary of pep-cprep" ON "CPREP_MASTER_PROJECT" OFF)
 
 
 file(GLOB_RECURSE CPREP_PUBLIC_SOURCES include/*.hpp)
@@ -33,4 +34,10 @@ endif()
 if(CPREP_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+
+if(CPREP_BUILD_BIN)
+    add_executable(pep-cprep-bin bin/main.cpp)
+    target_link_libraries(pep-cprep-bin PRIVATE pep-cprep)
 endif()

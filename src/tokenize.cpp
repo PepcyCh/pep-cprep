@@ -214,7 +214,7 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 exp_start = true;
                 has_exp = true;
                 can_be_sep = false;
-            } else if (ch == '-') {
+            } else if (ch == '-' || ch == '+') {
                 if (!last_exp_start) { return unknown(); }
             } else if ((has_exp || has_dot) && (ch == 'f' || ch == 'F')) {
                 number_end = input.get_p_curr();
