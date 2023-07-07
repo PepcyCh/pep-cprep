@@ -224,7 +224,7 @@ struct Preprocessor::Impl final {
                 result.parsed_result += token.value;
                 add_error(result, concat(
                     "at file '", files.top().path, "' line ", inputs.top().get_lineno(),
-                    ", failed to parse a valid token"
+                    ", failed to parse a valid token from '", token.value.substr(0, 15), "'"
                 ));
                 inputs.top().set_line_start(false);
                 continue;
@@ -605,7 +605,10 @@ struct Preprocessor::Impl final {
             auto token = get_next_token(inputs.top(), replaced, false);
             if (token.type == TokenType::eEof) { break; }
             if (token.type == TokenType::eUnknown) {
-                throw Preprocessorror{concat(err_loc, ", failed to parse a valid token")};
+                throw Preprocessorror{concat(
+                    err_loc, ", when evaluating expression, failed to parse a valid token from '",
+                    token.value.substr(0, 15), "'"
+                )};
             }
             if (token.type == TokenType::eIdentifier) {
                 if (auto it = defines.find(token.value); it != defines.end()) {
@@ -689,7 +692,8 @@ struct Preprocessor::Impl final {
                 if (token.type == TokenType::eUnknown) {
                     throw Preprocessorror{concat(
                         "at file '", curr_file, "' line ", curr_line,
-                        ", when replacing function-like macro '", macro_name, "', failed to parse a valid token"
+                        ", when replacing function-like macro '", macro_name, "', failed to parse a valid token from '",
+                        token.value.substr(0, 15), "'"
                     )};
                 }
                 if (token.type == TokenType::eLeftBracketRound) {
@@ -784,7 +788,10 @@ struct Preprocessor::Impl final {
                 break;
             } else if (token.type == TokenType::eUnknown) {
                 inputs.pop();
-                throw Preprocessorror{concat(err_loc, ", failed to parse a valid token")};
+                throw Preprocessorror{concat(
+                    err_loc, ", when replacing macro '", macro_name,
+                    "', failed to parse a valid token from '", token.value.substr(0, 15), "'"
+                )};
             }
             // stringify, only when macro is function-like
             if (macro.function_like) {

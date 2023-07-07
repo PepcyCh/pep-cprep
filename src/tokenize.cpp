@@ -215,7 +215,10 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
                 has_exp = true;
                 can_be_sep = false;
             } else if (ch == '-' || ch == '+') {
-                if (!last_exp_start) { return unknown(); }
+                if (!last_exp_start) {
+                    number_end = input.get_p_curr();
+                    break;
+                }
             } else if ((has_exp || has_dot) && (ch == 'f' || ch == 'F')) {
                 number_end = input.get_p_curr();
             } else if (('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')) {
