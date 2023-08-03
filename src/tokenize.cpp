@@ -134,7 +134,8 @@ Token get_next_token(InputState &input, std::string &output, bool space_cross_li
         auto second_ch = input.look_next_ch();
         // number 0
         if (
-            !is_digit(second_ch) && second_ch != '.'
+            first_ch == '0'
+            && !is_digit(second_ch) && second_ch != '.'
             && second_ch != 'x' && second_ch != 'X'
             && second_ch != 'b' && second_ch != 'B'
             && second_ch != 'e' && second_ch != 'E'

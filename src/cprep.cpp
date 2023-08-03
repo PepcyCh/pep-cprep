@@ -14,6 +14,8 @@ PEP_CPREP_NAMESPACE_BEGIN
 
 namespace {
 
+constexpr size_t MAX_ERROR_SIZE = 4096;
+
 struct Define final {
     std::string_view replace;
     std::vector<std::string_view> params;
@@ -903,9 +905,11 @@ struct Preprocessor::Impl final {
     }
 
     void add_error(Result &result, std::string_view msg) {
+        if (result.error.size() >= MAX_ERROR_SIZE) { return; }
         result.error += concat("error: ", msg, "\n");
     }
     void add_warning(Result &result, std::string_view msg) {
+        if (result.warning.size() >= MAX_ERROR_SIZE) { return; }
         result.warning += concat("warning: ", msg, "\n");
     }
 
