@@ -637,20 +637,41 @@ struct Preprocessor::Impl final {
                         }
                     }
                     replaced += value ? "1" : "0";
-                } else if (token.value == "true") {
-                    replaced += "1";
                 } else {
-                    // both 'false' and unknown identifier are replaced with '0'
-                    replaced += "0";
+                    replaced += token.value;
                 }
             } else {
                 replaced += token.value;
             }
         }
 
+        // replace identifiers ('true', 'false', undefined)
+        InputState input{replaced};
+        std::string replaced2{};
+        while (true) {
+            auto token = get_next_token(input, replaced2, false);
+            if (token.type == TokenType::eEof) { break; }
+            if (token.type == TokenType::eUnknown) {
+                throw Preprocessorror{concat(
+                    err_loc, ", when evaluating expression, failed to parse a valid token from '",
+                    token.value.substr(0, 15), "'"
+                )};
+            }
+            if (token.type == TokenType::eIdentifier) {
+                if (token.value == "true") {
+                    replaced2 += "1";
+                } else {
+                    // both 'false' and unknown identifier are replaced with '0'
+                    replaced2 += "0";
+                }
+            } else {
+                replaced2 += token.value;
+            }
+        }
+
         // evaluate expression
         try {
-            InputState input{replaced};
+            InputState input{replaced2};
             return evaluate_expression(input);
         } catch (const EvaluateError &e) {
             throw Preprocessorror{concat(err_loc, ", ", e.msg)};

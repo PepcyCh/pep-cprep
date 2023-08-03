@@ -97,12 +97,14 @@ bool test6(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &i
 R"(#if FOO
 int foo();
 #endif
-#if !BAR
+#define BAR true
+#if BAR
 int bar();
 #endif
 )";
     auto expected =
 R"(
+
 
 
 
