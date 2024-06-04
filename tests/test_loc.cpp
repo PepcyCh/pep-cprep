@@ -12,7 +12,7 @@ public:
     }
 };
 
-bool test1(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &includer) {
+bool test1(pep::cprep::Preprocessor &preprocessor, pep::cprep::ShaderIncluder &includer) {
     auto in_src =
 R"(int x = __LINE__;
 int y = __LINE__;
@@ -27,10 +27,10 @@ int y = 2;
 int z = 4 + \
     5;
 )";
-    return expect_ok(Preprocessor, includer, in_src, expected, nullptr, 0);
+    return expect_ok(preprocessor, includer, in_src, expected, nullptr, 0);
 }
 
-bool test2(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &includer) {
+bool test2(pep::cprep::Preprocessor &preprocessor, pep::cprep::ShaderIncluder &includer) {
     auto in_src =
 R"(int x = __LINE__;
 #line 10
@@ -43,10 +43,10 @@ R"(int x = 1;
 x = 10;
 int y = 11;
 )";
-    return expect_ok(Preprocessor, includer, in_src, expected, nullptr, 0);
+    return expect_ok(preprocessor, includer, in_src, expected, nullptr, 0);
 }
 
-bool test3(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &includer) {
+bool test3(pep::cprep::Preprocessor &preprocessor, pep::cprep::ShaderIncluder &includer) {
     auto in_src =
 R"(int x = __LINE__;
 #include "a.hpp"
@@ -62,18 +62,18 @@ std::string str = "/a.hpp";
 #line 3 "/test.cpp"
 int y = 3;
 )";
-    return expect_ok(Preprocessor, includer, in_src, expected, nullptr, 0);
+    return expect_ok(preprocessor, includer, in_src, expected, nullptr, 0);
 }
 
 int main() {
-    pep::cprep::Preprocessor Preprocessor{};
+    pep::cprep::Preprocessor preprocessor{};
     TestIncluder includer{};
 
     auto pass = true;
 
-    pass &= test1(Preprocessor, includer);
-    pass &= test2(Preprocessor, includer);
-    pass &= test3(Preprocessor, includer);
+    pass &= test1(preprocessor, includer);
+    pass &= test2(preprocessor, includer);
+    pass &= test3(preprocessor, includer);
 
     return pass ? 0 : 1;
 }

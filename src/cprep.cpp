@@ -365,49 +365,7 @@ struct Preprocessor::Impl final {
                 } else if (token.value == "include") {
                     unknown_directive = false;
                     token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
-                    // std::string_view header_name{};
-                    // std::string macro_replaced{};
-                    // InputState macro_input{macro_replaced};
-                    // InputState *header_input = &input;
                     bool del_is_quot = true;
-                    // if (token.type == TokenType::eIdentifier) {
-                    //     if (auto it = defines.find(token.value); it != defines.end()) {
-                    //         macro_replaced = replace_macro(token.value, it->second);
-                    //         macro_input = InputState{macro_replaced};
-                    //         header_input = &macro_input;
-                    //     } else {
-                    //         throw Preprocessorror{concat(
-                    //             "at file '", files.top().path, "' line ", input.get_lineno(),
-                    //             ", expected a header file name\n"
-                    //         )};
-                    //     }
-                    //     token = get_token(*header_input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
-                    // }
-                    // if (token.type == TokenType::eString) {
-                    //     header_name = token.value.substr(1, token.value.size() - 2);
-                    // } else if (token.type == TokenType::eLess) {
-                    //     del_is_quot = false;
-                    //     auto start = header_input->get_p_curr();
-                    //     while (true) {
-                    //         auto ch = header_input->look_next_ch();
-                    //         if (ch == '>') {
-                    //             header_name = make_string_view(start, header_input->get_p_curr());
-                    //             header_input->skip_next_ch();
-                    //             break;
-                    //         } else if (is_eof(ch) || ch == '\n') {
-                    //             throw Preprocessorror{concat(
-                    //                 "at file '", files.top().path, "' line ", input.get_lineno(),
-                    //                 ", expected a header file name\n"
-                    //             )};
-                    //         }
-                    //         header_input->skip_next_ch();
-                    //     }
-                    // } else {
-                    //     throw Preprocessorror{concat(
-                    //         "at file '", files.top().path, "' line ", input.get_lineno(),
-                    //         ", expected a header file name\n"
-                    //     )};
-                    // }
                     auto header_name = parse_header_name(result.parsed_result, input, token, del_is_quot);
                     ShaderIncluder::Result include_result{};
                     if (includer->require_header(header_name, files.top().path, include_result)) {

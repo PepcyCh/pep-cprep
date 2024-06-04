@@ -1,6 +1,6 @@
 #include "common.hpp"
 
-bool test1(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &includer) {
+bool test1(pep::cprep::Preprocessor &preprocessor, pep::cprep::ShaderIncluder &includer) {
     auto in_src =
 R"(#define FOO abc
 int func() { return 1'000'000'000u; }
@@ -45,16 +45,16 @@ do {         if (!(1)) {             abort();         }     } while (0);
 "abc";
 std::string ŝtrīňg = "你好";
 )";
-    return expect_ok(Preprocessor, includer, in_src, expected, nullptr, 0);
+    return expect_ok(preprocessor, includer, in_src, expected, nullptr, 0);
 }
 
 int main() {
-    pep::cprep::Preprocessor Preprocessor{};
+    pep::cprep::Preprocessor preprocessor{};
     pep::cprep::EmptyInclude includer{};
 
     auto pass = true;
 
-    pass &= test1(Preprocessor, includer);
+    pass &= test1(preprocessor, includer);
 
     return pass ? 0 : 1;
 }
