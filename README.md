@@ -46,11 +46,12 @@ Supported directives
 Supported features
 * basic object-like and function-like macro, stringification `#` and concatenation `##`
 * `-D` and `-U` options (both `-Dxxx=xxx` and `-D xxx=xxx` are ok)
+* `defined()`, `__has_include()`
 * `__FILE__`, `__LINE__`
 * variable number of parameters, `__VA_ARGS__`, `__VA_OPT__`
 * allow single `'` between numbers in integer or floating-point literal
 * customized include handler
-* unknown directive, pragma and includes are reserved, and a corresponding warning is added
+* unknown directives, pragmas and includes are reserved, and a corresponding warning is added
 * UTF-8 input and unicode identifier (but only UTF-8 input is acceptable currently)
 
 ## Integration

@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <stack>
+#include <queue>
 #include <vector>
 #include <algorithm>
 
@@ -14,7 +15,7 @@ PEP_CPREP_NAMESPACE_BEGIN
 
 namespace {
 
-constexpr size_t MAX_ERROR_SIZE = 4096;
+constexpr size_t kMaxErrorSize = 4096;
 
 struct Define final {
     std::string_view replace;
@@ -151,6 +152,7 @@ struct Preprocessor::Impl final {
         pragma_once_files.clear();
         while (!files.empty()) { files.pop(); }
         while (!inputs.empty()) { inputs.pop(); }
+        while (!cached_token.empty()) { cached_token.pop(); }
         while (!if_stack.empty()) { if_stack.pop(); }
         includer->clear();
     }
@@ -207,8 +209,8 @@ struct Preprocessor::Impl final {
 
     void parse_source(Result &result) {
         while (true) {
-            auto token = get_next_token(
-                inputs.top(), result.parsed_result, true,
+            auto token = get_token(
+                inputs.top(), result.parsed_result,
                 if_stack.top() == IfState::eTrue ? SpaceKeepType::eAll : SpaceKeepType::eNewLine
             );
             if (token.type == TokenType::eEof) {
@@ -264,7 +266,7 @@ struct Preprocessor::Impl final {
 
     void parse_directive(Result &result) {
         auto &input = inputs.top();
-        auto token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+        auto token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
         if (token.type != TokenType::eIdentifier) {
             if (token.type != TokenType::eEof) {
                 throw Preprocessorror{concat(
@@ -289,7 +291,7 @@ struct Preprocessor::Impl final {
                     unknown_directive = false;
                     std::string message{};
                     while (true) {
-                        token = get_next_token(input, message, false);
+                        token = get_token(input, message, SpaceKeepType::eAll, false, false);
                         if (token.type == TokenType::eEof) {
                             break;
                         }
@@ -308,7 +310,7 @@ struct Preprocessor::Impl final {
                     }
                 } else if (token.value == "pragma") {
                     unknown_directive = false;
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                     if (token.type != TokenType::eIdentifier) {
                         throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
@@ -327,7 +329,7 @@ struct Preprocessor::Impl final {
                     }
                 } else if (token.value == "line") {
                     unknown_directive = false;
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                     if (token.type != TokenType::eNumber) {
                         throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
@@ -349,7 +351,7 @@ struct Preprocessor::Impl final {
                             ", #line directive requires a positive integer argument\n"
                         )};
                     }
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                     if (token.type != TokenType::eEof) {
                         if (token.type != TokenType::eString) {
                             throw Preprocessorror{concat(
@@ -362,50 +364,51 @@ struct Preprocessor::Impl final {
                     input.set_lineno(line - 1);
                 } else if (token.value == "include") {
                     unknown_directive = false;
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
-                    std::string_view header_name{};
-                    std::string macro_replaced{};
-                    InputState macro_input{macro_replaced};
-                    InputState *header_input = &input;
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
+                    // std::string_view header_name{};
+                    // std::string macro_replaced{};
+                    // InputState macro_input{macro_replaced};
+                    // InputState *header_input = &input;
                     bool del_is_quot = true;
-                    if (token.type == TokenType::eIdentifier) {
-                        if (auto it = defines.find(token.value); it != defines.end()) {
-                            macro_replaced = replace_macro(token.value, it->second);
-                            macro_input = InputState{macro_replaced};
-                            header_input = &macro_input;
-                        } else {
-                            throw Preprocessorror{concat(
-                                "at file '", files.top().path, "' line ", input.get_lineno(),
-                                ", expected a header file name\n"
-                            )};
-                        }
-                        token = get_next_token(*header_input, result.parsed_result, false, SpaceKeepType::eNewLine);
-                    }
-                    if (token.type == TokenType::eString) {
-                        header_name = token.value.substr(1, token.value.size() - 2);
-                    } else if (token.type == TokenType::eLess) {
-                        del_is_quot = false;
-                        auto start = header_input->get_p_curr();
-                        while (true) {
-                            auto ch = header_input->look_next_ch();
-                            if (ch == '>') {
-                                header_name = make_string_view(start, header_input->get_p_curr());
-                                header_input->skip_next_ch();
-                                break;
-                            } else if (is_eof(ch) || ch == '\n') {
-                                throw Preprocessorror{concat(
-                                    "at file '", files.top().path, "' line ", input.get_lineno(),
-                                    ", expected a header file name\n"
-                                )};
-                            }
-                            header_input->skip_next_ch();
-                        }
-                    } else {
-                        throw Preprocessorror{concat(
-                            "at file '", files.top().path, "' line ", input.get_lineno(),
-                            ", expected a header file name\n"
-                        )};
-                    }
+                    // if (token.type == TokenType::eIdentifier) {
+                    //     if (auto it = defines.find(token.value); it != defines.end()) {
+                    //         macro_replaced = replace_macro(token.value, it->second);
+                    //         macro_input = InputState{macro_replaced};
+                    //         header_input = &macro_input;
+                    //     } else {
+                    //         throw Preprocessorror{concat(
+                    //             "at file '", files.top().path, "' line ", input.get_lineno(),
+                    //             ", expected a header file name\n"
+                    //         )};
+                    //     }
+                    //     token = get_token(*header_input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
+                    // }
+                    // if (token.type == TokenType::eString) {
+                    //     header_name = token.value.substr(1, token.value.size() - 2);
+                    // } else if (token.type == TokenType::eLess) {
+                    //     del_is_quot = false;
+                    //     auto start = header_input->get_p_curr();
+                    //     while (true) {
+                    //         auto ch = header_input->look_next_ch();
+                    //         if (ch == '>') {
+                    //             header_name = make_string_view(start, header_input->get_p_curr());
+                    //             header_input->skip_next_ch();
+                    //             break;
+                    //         } else if (is_eof(ch) || ch == '\n') {
+                    //             throw Preprocessorror{concat(
+                    //                 "at file '", files.top().path, "' line ", input.get_lineno(),
+                    //                 ", expected a header file name\n"
+                    //             )};
+                    //         }
+                    //         header_input->skip_next_ch();
+                    //     }
+                    // } else {
+                    //     throw Preprocessorror{concat(
+                    //         "at file '", files.top().path, "' line ", input.get_lineno(),
+                    //         ", expected a header file name\n"
+                    //     )};
+                    // }
+                    auto header_name = parse_header_name(result.parsed_result, input, token, del_is_quot);
                     ShaderIncluder::Result include_result{};
                     if (includer->require_header(header_name, files.top().path, include_result)) {
                         include_result.header_path = normalize_path(include_result.header_path);
@@ -430,7 +433,7 @@ struct Preprocessor::Impl final {
                     }
                 } else if (token.value == "define") {
                     unknown_directive = false;
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                     if (token.type != TokenType::eIdentifier) {
                         throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
@@ -447,7 +450,7 @@ struct Preprocessor::Impl final {
                         input.skip_next_ch();
                         macro.function_like = true;
                         while (true) {
-                            token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                            token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                             macro.has_va_params = token.type == TokenType::eTripleDots;
                             if (token.type == TokenType::eRightBracketRound) { break; }
                             if (token.type != TokenType::eIdentifier && token.type != TokenType::eTripleDots) {
@@ -457,7 +460,7 @@ struct Preprocessor::Impl final {
                                 )};
                             }
                             if (!macro.has_va_params) { macro.params.push_back(token.value); }
-                            token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                            token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                             if (token.type == TokenType::eRightBracketRound) { break; }
                             if (token.type != TokenType::eComma) {
                                 throw Preprocessorror{concat(
@@ -475,14 +478,14 @@ struct Preprocessor::Impl final {
                         start = input.get_p_curr();
                     }
                     while (true) {
-                        token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                        token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                         if (token.type == TokenType::eEof) { break; }
                     }
                     macro.replace = trim_string_view(input.get_substr_to_curr(start));
                     defines.insert({macro_name, std::move(macro)});
                 } else if (token.value == "undef") {
                     unknown_directive = false;
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                     if (token.type != TokenType::eIdentifier) {
                         throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
@@ -504,7 +507,7 @@ struct Preprocessor::Impl final {
                 unknown_directive = false;
                 if (if_stack.top() == IfState::eTrue) {
                     auto is_ifdef = token.value == "ifdef";
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                     if (token.type != TokenType::eIdentifier) {
                         throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
@@ -540,7 +543,7 @@ struct Preprocessor::Impl final {
                     )};
                 }
                 if (if_stack.top() == IfState::eFalseWithoutTrueBefore) {
-                    token = get_next_token(input, result.parsed_result, false, SpaceKeepType::eNewLine);
+                    token = get_token(input, result.parsed_result, SpaceKeepType::eNewLine, false, false);
                     if (token.type != TokenType::eIdentifier) {
                         throw Preprocessorror{concat(
                             "at file '", files.top().path, "' line ", input.get_lineno(),
@@ -588,15 +591,62 @@ struct Preprocessor::Impl final {
         // forward to line end
         const auto keep_value = unknown_directive && if_stack.top() == IfState::eTrue;
         while (true) {
-            token = get_next_token(
-                input, result.parsed_result, false,
-                keep_value ? SpaceKeepType::eAll : SpaceKeepType::eNewLine
+            token = get_token(
+                input, result.parsed_result,
+                keep_value ? SpaceKeepType::eAll : SpaceKeepType::eNewLine,
+                false, false
             );
             if (token.type == TokenType::eEof) { break; }
             if (keep_value) {
                 result.parsed_result += token.value;
             }
         }
+    }
+    std::string parse_header_name(std::string &spaces, InputState &input, Token token, bool &del_is_quot) {
+        std::string_view header_name{};
+        std::string macro_replaced{};
+        InputState macro_input{macro_replaced};
+        InputState *header_input = &input;
+        del_is_quot = true;
+        if (token.type == TokenType::eIdentifier) {
+            if (auto it = defines.find(token.value); it != defines.end()) {
+                macro_replaced = replace_macro(token.value, it->second);
+                macro_input = InputState{macro_replaced};
+                header_input = &macro_input;
+            } else {
+                throw Preprocessorror{concat(
+                    "at file '", files.top().path, "' line ", input.get_lineno(),
+                    ", expected a header file name\n"
+                )};
+            }
+            token = get_token(*header_input, spaces, SpaceKeepType::eNewLine, false, false);
+        }
+        if (token.type == TokenType::eString) {
+            header_name = token.value.substr(1, token.value.size() - 2);
+        } else if (token.type == TokenType::eLess) {
+            del_is_quot = false;
+            auto start = header_input->get_p_curr();
+            while (true) {
+                auto ch = header_input->look_next_ch();
+                if (ch == '>') {
+                    header_name = make_string_view(start, header_input->get_p_curr());
+                    header_input->skip_next_ch();
+                    break;
+                } else if (is_eof(ch) || ch == '\n') {
+                    throw Preprocessorror{concat(
+                        "at file '", files.top().path, "' line ", input.get_lineno(),
+                        ", expected a header file name\n"
+                    )};
+                }
+                header_input->skip_next_ch();
+            }
+        } else {
+            throw Preprocessorror{concat(
+                "at file '", files.top().path, "' line ", input.get_lineno(),
+                ", expected a header file name\n"
+            )};
+        }
+        return std::string{header_name};
     }
 
     bool evaluate() {
@@ -605,7 +655,7 @@ struct Preprocessor::Impl final {
 
         // replace macro and defined()
         while (true) {
-            auto token = get_next_token(inputs.top(), replaced, false);
+            auto token = get_token(inputs.top(), replaced, SpaceKeepType::eAll, false, false);
             if (token.type == TokenType::eEof) { break; }
             if (token.type == TokenType::eUnknown) {
                 throw Preprocessorror{concat(
@@ -617,7 +667,7 @@ struct Preprocessor::Impl final {
                 if (auto it = defines.find(token.value); it != defines.end()) {
                     replaced += replace_macro(token.value, it->second);
                 } else if (token.value == "defined") {
-                    token = get_next_token(inputs.top(), replaced, false);
+                    token = get_token(inputs.top(), replaced, SpaceKeepType::eAll, false, false);
                     bool value;
                     if (token.type == TokenType::eIdentifier) {
                         value = defines.contains(token.value);
@@ -627,17 +677,32 @@ struct Preprocessor::Impl final {
                                 err_loc, ", expected a '(' or an identifier after 'defined'"
                             )};
                         }
-                        token = get_next_token(inputs.top(), replaced, false);
+                        token = get_token(inputs.top(), replaced, SpaceKeepType::eAll, false, false);
                         if (token.type != TokenType::eIdentifier) {
                             throw Preprocessorror{concat(err_loc, ", expected an identifier inside 'defined'")};
                         }
                         value = defines.contains(token.value);
-                        token = get_next_token(inputs.top(), replaced, false);
+                        token = get_token(inputs.top(), replaced, SpaceKeepType::eAll, false, false);
                         if (token.type != TokenType::eRightBracketRound) {
                             throw Preprocessorror{concat(err_loc, ", expected a ')' after 'defined'")};
                         }
                     }
                     replaced += value ? "1" : "0";
+                } else if (token.value == "__has_include") {
+                    token = get_token(inputs.top(), replaced, SpaceKeepType::eAll, false, false);
+                    if (token.type != TokenType::eLeftBracketRound) {
+                        throw Preprocessorror{concat(err_loc, ", expected a '(' after '__has_include'")};
+                    }
+                    bool del_is_quot;
+                    token = get_token(inputs.top(), replaced, SpaceKeepType::eAll, false, false);
+                    auto header_name = parse_header_name(replaced, inputs.top(), token, del_is_quot);
+                    ShaderIncluder::Result include_result{};
+                    auto has_include = includer->require_header(header_name, files.top().path, include_result);
+                    replaced += has_include ? "1" : "0";
+                    token = get_token(inputs.top(), replaced, SpaceKeepType::eAll, false, false);
+                    if (token.type != TokenType::eRightBracketRound) {
+                        throw Preprocessorror{concat(err_loc, ", expected a ')' after '__has_include'")};
+                    }
                 } else {
                     replaced += token.value;
                 }
@@ -650,7 +715,7 @@ struct Preprocessor::Impl final {
         InputState input{replaced};
         std::string replaced2{};
         while (true) {
-            auto token = get_next_token(input, replaced2, false);
+            auto token = get_token(input, replaced2, SpaceKeepType::eAll, false, false);
             if (token.type == TokenType::eEof) { break; }
             if (token.type == TokenType::eUnknown) {
                 throw Preprocessorror{concat(
@@ -697,7 +762,7 @@ struct Preprocessor::Impl final {
         if (macro.function_like) {
             std::string fallback{macro_name};
             args.reserve(macro.params.size());
-            auto token = get_next_token(inputs.top(), fallback);
+            auto token = get_token(inputs.top(), fallback, SpaceKeepType::eAll);
             if (token.type != TokenType::eLeftBracketRound) {
                 fallback += token.value;
                 return fallback;
@@ -705,7 +770,7 @@ struct Preprocessor::Impl final {
             size_t num_brackets = 0;
             auto last_begin = token.value.data() + token.value.size();
             while (true) {
-                token = get_next_token(inputs.top(), fallback);
+                token = get_token(inputs.top(), fallback, SpaceKeepType::eAll);
                 if (token.type == TokenType::eEof) {
                     throw Preprocessorror{concat(
                         "at file '", curr_file, "' line ", curr_line,
@@ -802,11 +867,11 @@ struct Preprocessor::Impl final {
             }
         };
         std::string result_phase1{};
-        auto token = get_next_token(inputs.top(), result_phase1, true, SpaceKeepType::eSpace);
+        auto token = get_token(inputs.top(), result_phase1, SpaceKeepType::eSpace);
         std::string spaces{};
         std::string concat_str{};
         while (true) {
-            auto next_token = get_next_token(inputs.top(), spaces, true, SpaceKeepType::eSpace);
+            auto next_token = get_token(inputs.top(), spaces, SpaceKeepType::eSpace);
             if (token.type == TokenType::eEof) {
                 inputs.pop();
                 break;
@@ -847,14 +912,14 @@ struct Preprocessor::Impl final {
                         }
                         result_phase1 += '"' + stringify(args[it - macro.params.begin()]) + '"';
                     }
-                    token = get_next_token(inputs.top(), result_phase1, true, SpaceKeepType::eSpace);
+                    token = get_token(inputs.top(), result_phase1, SpaceKeepType::eSpace);
                     spaces.clear();
                     continue;
                 }
             }
             // concat
             if (next_token.type == TokenType::eDoubleSharp) {
-                next_token = get_next_token(inputs.top(), spaces, true, SpaceKeepType::eSpace);
+                next_token = get_token(inputs.top(), spaces, SpaceKeepType::eSpace);
                 if (concat_str.empty()) {
                     append_token(concat_str, token);
                 }
@@ -881,20 +946,20 @@ struct Preprocessor::Impl final {
         inputs.emplace(result_phase1);
         std::string result_phase2{};
         while (true) {
-            token = get_next_token(inputs.top(), result_phase2);
+            token = get_token(inputs.top(), result_phase2, SpaceKeepType::eAll);
             if (token.type == TokenType::eEof) {
                 inputs.pop();
                 break;
             }
             if (token.type == TokenType::eIdentifier) {
                 if (macro.has_va_params && token.value == "__VA_OPT__") {
-                    token = get_next_token(inputs.top(), result_phase2);
+                    token = get_token(inputs.top(), result_phase2, SpaceKeepType::eAll);
                     if (token.type == TokenType::eLeftBracketRound) {
                         size_t num_brackets = 0;
                         auto opt_true = args.size() > macro.params.size()
                             && (!args[macro.params.size()].empty() || args.size() > macro.params.size() + 1);
                         while (true) {
-                            token = get_next_token(inputs.top(), result_phase2);
+                            token = get_token(inputs.top(), result_phase2, SpaceKeepType::eAll);
                             if (token.type == TokenType::eEof) {
                                 break;
                             } else if (token.type == TokenType::eLeftBracketRound) {
@@ -925,7 +990,7 @@ struct Preprocessor::Impl final {
         inputs.emplace(result_phase2);
         std::string result{};
         while (true) {
-            token = get_next_token(inputs.top(), result);
+            token = get_token(inputs.top(), result, SpaceKeepType::eAll);
             if (token.type == TokenType::eEof) {
                 inputs.pop();
                 break;
@@ -945,12 +1010,33 @@ struct Preprocessor::Impl final {
     }
 
     void add_error(Result &result, std::string_view msg) {
-        if (result.error.size() >= MAX_ERROR_SIZE) { return; }
+        if (result.error.size() >= kMaxErrorSize) { return; }
         result.error += concat("error: ", msg, "\n");
     }
     void add_warning(Result &result, std::string_view msg) {
-        if (result.warning.size() >= MAX_ERROR_SIZE) { return; }
+        if (result.warning.size() >= kMaxErrorSize) { return; }
         result.warning += concat("warning: ", msg, "\n");
+    }
+
+    Token get_token(InputState &input, std::string &spaces, SpaceKeepType space_type, bool keep = false, bool space_cross_line = true) {
+        if (cached_token.empty()) {
+            auto token = get_next_token(input, spaces, space_cross_line, space_type);
+            if (keep) { push_token(token); }
+            return token;
+        } else {
+            if (
+                !spaces.empty() && !std::isspace(spaces.back())
+                && (space_type & SpaceKeepType::eSpace) != SpaceKeepType::eNothing
+            ) {
+                spaces += ' ';
+            }
+            auto token = cached_token.front();
+            if (!keep) { cached_token.pop(); }
+            return token;
+        }
+    }
+    void push_token(Token token) {
+        cached_token.push(token);
     }
 
     std::unordered_map<std::string_view, Define> defines;
@@ -958,6 +1044,7 @@ struct Preprocessor::Impl final {
     std::unordered_set<std::string_view> pragma_once_files;
     std::stack<FileState> files;
     std::stack<InputState> inputs;
+    std::queue<Token> cached_token{};
     std::stack<IfState> if_stack;
     ShaderIncluder *includer = nullptr;
     std::string_view curr_file; // used in replace_macro

@@ -64,6 +64,40 @@ int main() {
     return expect_ok(Preprocessor, includer, in_src, expected, options, 1);
 }
 
+bool test2(pep::cprep::Preprocessor &Preprocessor, pep::cprep::ShaderIncluder &includer) {
+    auto in_src =
+R"(#if __has_include("a.hpp")
+#define FOO 1
+#else
+#define FOO 0
+#endif
+#if __has_include("c.hpp")
+#define BAR 1
+#else
+#define BAR 0
+#endif
+int main() {
+    return FOO * BAR;
+}
+)";
+    auto expected =
+R"(
+
+
+
+
+
+
+
+
+
+int main() {
+    return 1 * 0;
+}
+)";
+    return expect_ok(Preprocessor, includer, in_src, expected, nullptr, 0);
+}
+
 int main() {
     pep::cprep::Preprocessor Preprocessor{};
     TestIncluder includer{};
@@ -71,6 +105,7 @@ int main() {
     auto pass = true;
 
     pass &= test1(Preprocessor, includer);
+    pass &= test2(Preprocessor, includer);
 
     return pass ? 0 : 1;
 }
